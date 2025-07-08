@@ -6,6 +6,15 @@ __pycache__/
 # C extensions
 *.so
 
+# Vectorstores and Folders
+resume_vectorstore
+jd
+data
+candidates.db
+test_db.py
+model_load.py
+sql_data.py
+
 # Distribution / packaging
 .Python
 build/
