@@ -1,11 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="DataSourceManagerImpl" format="xml" multifile-model="true">
+<<<<<<< HEAD
     <data-source source="LOCAL" name="candidates" uuid="e03833bc-f223-4cff-b461-dabc49d9db30">
       <driver-ref>sqlite.xerial</driver-ref>
       <synchronize>true</synchronize>
       <jdbc-driver>org.sqlite.JDBC</jdbc-driver>
       <jdbc-url>jdbc:sqlite:$PROJECT_DIR$/backened/core/data/candidates.db</jdbc-url>
+=======
+    <data-source source="LOCAL" name="chroma" uuid="2425b2b8-29a9-40f0-a6bf-c61e39791834">
+      <driver-ref>sqlite.xerial</driver-ref>
+      <synchronize>true</synchronize>
+      <jdbc-driver>org.sqlite.JDBC</jdbc-driver>
+      <jdbc-url>jdbc:sqlite:$PROJECT_DIR$/resume_vectorstore/chroma.sqlite3</jdbc-url>
+>>>>>>> 0b0ac57416eb71e58146be18c497a1fec07fa2c9
       <working-dir>$ProjectFileDir$</working-dir>
     </data-source>
   </component>
