@@ -1,0 +1,19 @@
+# Data
+../chroma_resume_db
+evaluation_results
+Evaluation_Scores/all_resume_evaluations.json
+Evaluation_Scores/llama_scores.json
+Evaluation_Scores/mistral_scores.json
+
+# Processing Code Files
+../Rag_Eval.py
+../llm_evaluation.py
+../evaluate_all.py
+../resume_matcher.py
+
+#Env
+.venv
+.idea
+.gitignore
+.git
+.DS_Store

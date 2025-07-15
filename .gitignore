@@ -4,9 +4,7 @@ data
 evaluation_results
 jd
 jd_json
-all_resume_evaluations.json
-llama_scores.json
-mistral_scores.json
+Evaluation_Scores
 
 # Processing Code Files
 Rag_Eval.py
@@ -17,5 +15,9 @@ resume_matcher.py
 #Env
 .venv
 .idea
+Backend/.dockerignore
+
+#Python Cache
+__pycache__
 
 .DS_Store

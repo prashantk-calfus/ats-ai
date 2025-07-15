@@ -2,7 +2,7 @@ import os
 import json
 from langchain_community.llms import Ollama
 from langchain_community.document_loaders import PyMuPDFLoader
-from LLM_CHAIN.llm_chain_agent import extract_json_from_response
+from Backend.llm_chain_agent import extract_json_from_response
 
 def load_pdf_text(file_path: str) -> str:
     loader = PyMuPDFLoader(file_path)
@@ -10,7 +10,7 @@ def load_pdf_text(file_path: str) -> str:
     return " ".join(page.page_content for page in pages)
 
 def extract_jd_info(jd_text: str) -> dict:
-    llm = Ollama(model="gemma3:12b")
+    llm = Ollama(model="llama3.1:8b")
 
     prompt = f"""
         You are a job description parser.

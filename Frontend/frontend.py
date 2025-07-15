@@ -52,7 +52,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Backend configuration
-BACKEND_URL = "http://localhost:8000"  # Adjust this to your backend URL
+BACKEND_URL = "http://localhost:8000"  # Adjust this to docker backend url - 'backend'
 
 # Job Description mappings - Update these paths according to your backend
 JD_OPTIONS = {
@@ -61,44 +61,56 @@ JD_OPTIONS = {
     "Data Architect" : "DataArch.json"
 }
 
-RESUME_UPLOAD_FOLDER = "data/"
+import re
 
 def upload_resume(file) -> Optional[Dict[str, Any]]:
-    """Upload resume to backend and get parsed data"""
     try:
-        # Reset file pointer to beginning
         file.seek(0)
-
-        # Your backend expects 'resume_file' parameter and only accepts PDF
         files = {"resume_file": (file.name, file.getvalue(), file.type)}
+        upload_response = requests.post(f"{BACKEND_URL}/upload_resume_file", files=files)
 
-        response = requests.post(f"{BACKEND_URL}/upload_resume_file", files=files)
+        if upload_response.status_code == 200 and upload_response.json().get("message") == "Resume uploaded successfully":
+            st.success("Resume uploaded successfully!")
 
-        if response.status_code == 200:
-            response_data = response.json()
-            if response_data.get("message") == "Resume uploaded successfully":
-                st.success("Resume uploaded successfully!")
+            stream_url = f"{BACKEND_URL}/resume_parser"
+            params = {"resume_path": file.name}
 
-                # TODO: Add call to parse endpoint here if you have one
-                parse_response = requests.get(f"{BACKEND_URL}/resume_parser",
-                                               {"resume_path": file.name})
+            merged_json = {}
+            buffer = ""
+            stream_output = st.empty()
 
-                if parse_response.status_code == 200:
-                    parsed_json = parse_response.json()
-                    return parsed_json  # ✅ Return the actual parsed data here
-                else:
-                    st.error(f"Failed to parse resume: {parse_response.status_code}")
-                    return None
-            else:
-                st.error(f"Backend returned: {response_data.get('message', 'Unknown error')}")
-                return None
+            decoder = json.JSONDecoder()
+
+            with requests.get(stream_url, params=params, stream=True, timeout=180) as resp:
+                resp.raise_for_status()
+
+                for line in resp.iter_lines(decode_unicode=True):
+                    if not line or not line.strip():
+                        continue
+
+                    buffer += line.strip()
+
+                    while buffer:
+                        try:
+                            parsed_obj, idx = decoder.raw_decode(buffer)
+                            buffer = buffer[idx:].lstrip()
+                            merged_json.update(parsed_obj)
+
+                            # Live update chunk
+                            stream_output.code(json.dumps(parsed_obj, indent=2), language="json")
+                        except json.JSONDecodeError:
+                            break
+
+            st.write(merged_json)
+            return merged_json
+
         else:
-            st.error(f"Failed to upload resume: {response.status_code} - {response.text}")
+            st.error(f"Upload failed: {upload_response.status_code} - {upload_response.text}")
             return None
-    except Exception as e:
-        st.error(f"Error uploading resume: {str(e)}")
-        return None
 
+    except Exception as e:
+        st.error(f"Error during upload/streaming: {str(e)}")
+        return None
 
 def evaluate_resume(parsed_data: Dict[str, Any], jd_path: str) -> Optional[Dict[str, Any]]:
     """Send evaluation request to backend"""
@@ -108,17 +120,38 @@ def evaluate_resume(parsed_data: Dict[str, Any], jd_path: str) -> Optional[Dict[
             "resume_json": parsed_data,
             "jd_path": jd_path
         }
-        response = requests.post(f"{BACKEND_URL}/evaluate_resume", json=payload)
 
-        if response.status_code == 200:
-            return response.json()
-        else:
-            st.error(f"Failed to evaluate resume: {response.status_code}")
-            return None
+        merged_json = {}
+        buffer = ""
+        stream_output = st.empty()
+
+        decoder = json.JSONDecoder()
+
+        with requests.get("{BACKEND_URL}/evaluate_resume", json=payload, stream=True, timeout=180) as resp:
+            resp.raise_for_status()
+
+            for line in resp.iter_lines(decode_unicode=True):
+                if not line or not line.strip():
+                    continue
+
+                buffer += line.strip()
+
+                while buffer:
+                    try:
+                        parsed_obj, idx = decoder.raw_decode(buffer)
+                        buffer = buffer[idx:].lstrip()
+                        merged_json.update(parsed_obj)
+
+                        # Live update chunk
+                        stream_output.code(json.dumps(parsed_obj, indent=2), language="json")
+                    except json.JSONDecodeError:
+                        break
+
+        st.write(merged_json)
+        return merged_json
     except Exception as e:
-        st.error(f"Error evaluating resume: {str(e)}")
+        st.error(f"Error during upload/streaming: {str(e)}")
         return None
-
 
 def display_parsed_resume(data: Dict[str, Any]):
     """Display parsed resume data in a structured format"""
@@ -193,23 +226,33 @@ def display_parsed_resume(data: Dict[str, Any]):
         st.write("No certifications available")
 
     # Skills
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     with col1:
         st.markdown("**Programming Languages:**")
         prog_langs = data.get("Programming_Language", [])
         if prog_langs:
-            st.write(", ".join(prog_langs))
+            for lang in prog_langs:
+                st.write(lang+"\n")
         else:
             st.write("None specified")
 
     with col2:
-        st.markdown("**Frameworks & Technologies:**")
+        st.markdown("**Frameworks:**")
         frameworks = data.get("Frameworks", [])
         if frameworks:
-            st.write(", ".join(frameworks))
+            for framework in frameworks:
+                st.write(framework+"\n")
         else:
             st.write("None specified")
 
+    with col3:
+        st.markdown("**Technologies:**")
+        techs = data.get("Technologies", [])
+        if techs:
+            for tech in techs:
+                st.write(tech+"\n")
+        else:
+            st.write("None specified")
 
 def display_evaluation_results(data: Dict[str, Any]):
     """Display evaluation results in a structured format"""
@@ -229,7 +272,9 @@ def display_evaluation_results(data: Dict[str, Any]):
 
     # Match Percentage
     st.markdown('<div class="score-box">', unsafe_allow_html=True)
-    st.markdown(f"**Match with JD:** {data.get('Match with JD', '0%')}")
+    st.markdown(
+        f'<span style="font-size:24px;"><strong>Match with JD:</strong> {data.get("Match with JD", "0%")}</span>',
+        unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
     # Pros and Cons
@@ -290,6 +335,10 @@ def display_evaluation_results(data: Dict[str, Any]):
         else:
             st.write("No extra skills")
         st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown(
+        f'<span style="font-size:24px;"><strong>Qualification Status (AI-Assist):</strong> {data.get('qualification_status', 'Unable to Fetch. Try Again')}</span>',
+        unsafe_allow_html=True)
 
 
 def main():
