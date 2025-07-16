@@ -1,0 +1,47 @@
+{
+  "Job_Title": "Senior Python Development Engineer",
+  "Required_Skills": [
+    "Python",
+    "Django",
+    "Flask",
+    "FastAPI",
+    "Pandas",
+    "NumPy",
+    "Sklearn",
+    "RESTful API",
+    "Docker",
+    "SQL",
+    "PostgreSQL",
+    "MySQL"
+  ],
+  "Preferred_Skills": [
+    "MongoDB",
+    "DynamoDB",
+    "AWS",
+    "Microsoft Azure",
+    "NoSQL databases"
+  ],
+  "Minimum_Experience": "5 to 7 years",
+  "Location": null,
+  "Responsibilities": [
+    "Design and Development",
+    "Leadership & Mentorship",
+    "Collaboration",
+    "Code Quality Assurance",
+    "Troubleshooting and Debugging",
+    "Staying Informed",
+    "Performance Optimization",
+    "Documentation"
+  ],
+  "Qualifications": [
+    "Software development processes",
+    "Object Oriented Python",
+    "Strong testing and debugging skills",
+    "Ability to integrate multiple data sources and databases into one system",
+    "Analytical mind",
+    "Strong communication skills",
+    "Experience with system architecture",
+    "Strong knowledge of software design patterns"
+  ],
+  "Domain": "Software Development"
+}

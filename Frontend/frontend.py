@@ -407,7 +407,7 @@ if 'decision_made' not in st.session_state:
 
 # --- Section 1: Upload Resume ---
 st.header("1. Upload Resume")
-uploaded_file = st.file_uploader("Choose a resume file (PDF, DOCX)", type=["pdf", "docx"])
+uploaded_file = st.file_uploader("Choose a resume file (PDF)", type=["pdf", "docx"])
 
 # Placeholder for messages during upload/parsing
 parsing_status_messages = st.empty()
@@ -472,6 +472,7 @@ if st.session_state.parsed_resume:
 if st.session_state.show_jd_sections:
     # --- Section 2: Provide Job Description ---
     st.header("2. Provide Job Description")
+
 
     # Create a dropdown for JD options
     selected_jd_display = st.selectbox(

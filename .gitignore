@@ -3,7 +3,7 @@ chroma_resume_db
 data
 evaluation_results
 jd
-jd_json
+#jd_json
 Evaluation_Scores
 
 # Processing Code Files

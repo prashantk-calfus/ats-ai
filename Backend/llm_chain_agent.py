@@ -160,7 +160,7 @@ async def evaluate_resume_against_jd(jd_json: str, resume_data: dict) -> AsyncGe
 
     prompt = f"""
         You are a senior HR professional and technical recruiter with 15+ years of experience. You specialize in evaluating candidates against job requirements and providing detailed, actionable feedback.
-    
+        Be prepared for diff JD formats.
         EVALUATION TASK:
         Carefully evaluate the candidate's resume against the job description provided. Give a comprehensive assessment that will help in making hiring decisions.
     
