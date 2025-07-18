@@ -5,13 +5,18 @@ __pycache__/
 None/
 .DS_Store/
 
+# Data Folder
+data
+jd
+jd_json
+
 # Test files
 .coverage
 .coverage.*
 .cache
 
 # Environments
-.env
+.venv
 env/
 venv/
 ENV/
@@ -21,4 +26,3 @@ venv.bak/
 
 # Log Dir
 .logs/
-logs/

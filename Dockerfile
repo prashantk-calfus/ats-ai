@@ -24,7 +24,7 @@ COPY . .
 RUN chmod +x start.sh
 
 # Create log directory (in case it isn't mounted)
-RUN mkdir -p .logs
+RUN mkdir -p ..logs
 
 # Start both apps
 # CMD ["./start.sh"]
