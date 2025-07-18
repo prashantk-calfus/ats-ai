@@ -1,12 +1,13 @@
 """Testing out the new frontend changes."""
-import os
-import uuid
 
-import streamlit as st
-import requests
 import json
-from typing import Optional, Dict, Any
+import os
 import time
+import uuid
+from typing import Any, Dict, Optional
+
+import requests
+import streamlit as st
 from streamlit.runtime.scriptrunner import add_script_run_ctx
 
 # Assuming these are defined in your project or passed as environment variables
@@ -16,16 +17,16 @@ JD_OPTIONS = {
     "Select a pre-existing JD": "Select a pre-existing JD",
     "Senior Python Development Engineer": "SrPDE.json",
     "Oracle ERP": "OracleERP.json",
-    "Data Architect" : "DataArchJD.json",
-    "Senior Full Stack Engineer": "SeniorFullStackEngineer_Python.json"
+    "Data Architect": "DataArchJD.json",
+    "Senior Full Stack Engineer": "SeniorFullStackEngineer_Python.json",
 }
 
 
 # --- Helper function for structured display of parsed resume chunks ---
 def display_parsed_resume_chunk(chunk_data: Dict[str, Any], chunk_id: int):
     """
-        This helper now accepts the full parsed_resume_data and extracts relevant parts
-        based on the chunk_id for structured display.
+    This helper now accepts the full parsed_resume_data and extracts relevant parts
+    based on the chunk_id for structured display.
     """
 
     if chunk_id == 1:
@@ -123,10 +124,8 @@ def display_evaluation_chunk(chunk_data: Dict[str, Any], chunk_id: int):
         match_jd = chunk_data.get("Match with JD", "N/A").strip()
         status = chunk_data.get("qualification_status", "N/A")
 
-
         if not match_jd or match_jd is "NA" or match_jd is "0%":
             exp_score = skills_score = edu_score = overall_score = "N/A"
-
 
         st.markdown("**Evaluation Scores:**")
         st.write(f"- Experience Score: **{exp_score}/10**")
@@ -189,18 +188,18 @@ def display_final_evaluation_results(evaluation_results):
 
     # Display Overall Scores
     # overall_score = evaluation_results.get('Overall_Score', None)
-    match_with_jd = evaluation_results.get('Match with JD', None).strip()
-    qualification_status = evaluation_results.get('qualification_status', None)
+    match_with_jd = evaluation_results.get("Match with JD", None).strip()
+    qualification_status = evaluation_results.get("qualification_status", None)
 
-    exp_score = evaluation_results.get('Experience_Score', 'N/A')
-    skills_score = evaluation_results.get('Skills_Score', 'N/A')
-    edu_score = evaluation_results.get('Education_Score', 'N/A')
+    exp_score = evaluation_results.get("Experience_Score", "N/A")
+    skills_score = evaluation_results.get("Skills_Score", "N/A")
+    edu_score = evaluation_results.get("Education_Score", "N/A")
 
     if not match_with_jd or match_with_jd is "NA" or match_with_jd is "0%":
-        exp_score = skills_score = edu_score = 'N/A'
-        overall_score = 'N/A'
+        exp_score = skills_score = edu_score = "N/A"
+        overall_score = "N/A"
 
-    overall_score = evaluation_results.get('Overall_Score', 'N/A')
+    overall_score = evaluation_results.get("Overall_Score", "N/A")
 
     if overall_score is not None and match_with_jd is not None:
         col_score1, col_score2, col_score3 = st.columns(3)
@@ -226,12 +225,11 @@ def display_final_evaluation_results(evaluation_results):
     with col_ind_score3:
         st.metric(label="Education Score (0-10)", value=edu_score)
 
-
     # Display Pros and Cons
     st.markdown("---")
     st.markdown("#### Strengths and Areas for Improvement ")
-    pros = evaluation_results.get('Pros', [])
-    cons = evaluation_results.get('Cons', [])
+    pros = evaluation_results.get("Pros", [])
+    cons = evaluation_results.get("Cons", [])
 
     col_pros, col_cons = st.columns(2)
     with col_pros:
@@ -252,9 +250,9 @@ def display_final_evaluation_results(evaluation_results):
     # Display Skills Match
     st.markdown("---")
     st.markdown("#### Skills Match Analysis ")
-    skills_match = evaluation_results.get('Skills Match', [])
-    skills_not_matching = evaluation_results.get('Skills not matching with JD', [])
-    extra_skills = evaluation_results.get('Extra skills', [])
+    skills_match = evaluation_results.get("Skills Match", [])
+    skills_not_matching = evaluation_results.get("Skills not matching with JD", [])
+    extra_skills = evaluation_results.get("Extra skills", [])
     no_skill_match_flag = 0
 
     if skills_match:
@@ -279,7 +277,7 @@ def display_final_evaluation_results(evaluation_results):
 
 # --- Modified backend communication functions ---
 def upload_resume(file, live_parsing_status_placeholder) -> Optional[Dict[str, Any]]:
-    st.session_state.parsed_resume_chunks = {} # Initialize to store chunks for expander display
+    st.session_state.parsed_resume_chunks = {}  # Initialize to store chunks for expander display
     try:
         file.seek(0)
         files = {"resume_file": (file.name, file.getvalue(), file.type)}
@@ -298,7 +296,6 @@ def upload_resume(file, live_parsing_status_placeholder) -> Optional[Dict[str, A
 
             # Create an empty placeholder to update live parsing. This is where chunks will appear and then be cleared.
             live_parsing_display_placeholder = st.empty()
-
 
             with requests.get(stream_url, params=params, stream=True, timeout=180) as resp:
                 resp.raise_for_status()
@@ -332,11 +329,13 @@ def upload_resume(file, live_parsing_status_placeholder) -> Optional[Dict[str, A
                         except json.JSONDecodeError:
                             break
                         except Exception as e:
-                            live_parsing_status_placeholder.warning(f"Error decoding JSON chunk during parsing: {e} - Line: '{line.strip()}'")
+                            live_parsing_status_placeholder.warning(
+                                f"Error decoding JSON chunk during parsing: {e} - Line: '{line.strip()}'"
+                            )
                             buffer = ""
                             break
 
-            live_parsing_display_placeholder.empty() # Clear the live display after all chunks are received
+            live_parsing_display_placeholder.empty()  # Clear the live display after all chunks are received
             live_parsing_status_placeholder.success("Resume parsing complete! View details in the dropdown below.")
             return merged_json
 
@@ -359,16 +358,12 @@ def evaluate_resume(parsed_data: Dict[str, Any], jd_path: str, evaluation_status
             evaluation_status_placeholder.warning("No parsed resume data available for evaluation.")
             return None
 
-        payload = {
-            "resume_json": parsed_data,
-            "jd_path": jd_path
-        }
+        payload = {"resume_json": parsed_data, "jd_path": jd_path}
 
         evaluation_status_placeholder.info(f"Sending evaluation request with JD: `{jd_path}`....")
 
         # with st.expander("Payload sent to Backend (for debugging)"):
         #     st.json(payload)
-
 
         merged_json = {}
         decoder = json.JSONDecoder()
@@ -389,7 +384,6 @@ def evaluate_resume(parsed_data: Dict[str, Any], jd_path: str, evaluation_status
                 while "---END_OF_JSON_CHUNK--" in buffer:
                     buffer, _, remaining_buffer = buffer.partition("---END_OF_JSON_CHUNK--")
 
-
                 while buffer:
                     try:
                         parsed_obj, idx = decoder.raw_decode(buffer)
@@ -407,7 +401,9 @@ def evaluate_resume(parsed_data: Dict[str, Any], jd_path: str, evaluation_status
                     except json.JSONDecodeError:
                         break
                     except Exception as e:
-                        evaluation_status_placeholder.warning(f"Error decoding JSON chunk during evaluation: {e} - Line: '{line.strip()}'")
+                        evaluation_status_placeholder.warning(
+                            f"Error decoding JSON chunk during evaluation: {e} - Line: '{line.strip()}'"
+                        )
                         buffer = ""
                         break
 
@@ -415,11 +411,13 @@ def evaluate_resume(parsed_data: Dict[str, Any], jd_path: str, evaluation_status
                 try:
                     os.remove(st.session_state.temp_jd_path)
                     evaluation_status_placeholder.success(
-                        f"Cleaned up temporary JD file: `{os.path.basename(st.session_state.temp_jd_path)}`")
+                        f"Cleaned up temporary JD file: `{os.path.basename(st.session_state.temp_jd_path)}`"
+                    )
                     st.session_state.temp_jd_path = None
                 except Exception as e:
                     evaluation_status_placeholder.warning(
-                        f"Could not delete temporary JD file `{st.session_state.temp_jd_path}`: {e}")
+                        f"Could not delete temporary JD file `{st.session_state.temp_jd_path}`: {e}"
+                    )
 
         # Clear live evaluation display after completion
         live_evaluation_display_placeholder.empty()
@@ -433,23 +431,24 @@ def evaluate_resume(parsed_data: Dict[str, Any], jd_path: str, evaluation_status
         evaluation_status_placeholder.error(f"An unexpected error occurred during evaluation: {str(e)}")
         return None
 
+
 # --- Streamlit Frontend (main app structure remains the same) ---
 st.set_page_config(layout="wide", page_title="Resume Analyzer")
 
 st.title("Resume Analyzer and Evaluator")
 
 # Session state to store parsed and evaluated data
-if 'parsed_resume' not in st.session_state:
+if "parsed_resume" not in st.session_state:
     st.session_state.parsed_resume = None
-if 'parsed_resume_chunks' not in st.session_state:
+if "parsed_resume_chunks" not in st.session_state:
     st.session_state.parsed_resume_chunks = {}
-if 'evaluation_results' not in st.session_state:
+if "evaluation_results" not in st.session_state:
     st.session_state.evaluation_results = None
-if 'show_jd_sections' not in st.session_state:
+if "show_jd_sections" not in st.session_state:
     st.session_state.show_jd_sections = False
-if 'decision_made' not in st.session_state:
+if "decision_made" not in st.session_state:
     st.session_state.decision_made = None
-if 'temp_jd_path' not in st.session_state:
+if "temp_jd_path" not in st.session_state:
     st.session_state.temp_jd_path = None
 
 
@@ -508,12 +507,14 @@ if st.session_state.parsed_resume:
             skills_data_for_display = {
                 "Programming_Language": st.session_state.parsed_resume.get("Programming_Language", []),
                 "Frameworks": st.session_state.parsed_resume.get("Frameworks", []),
-                "Technologies": st.session_state.parsed_resume.get("Technologies", [])
+                "Technologies": st.session_state.parsed_resume.get("Technologies", []),
             }
-            if skills_data_for_display["Programming_Language"] or \
-               skills_data_for_display["Frameworks"] or \
-               skills_data_for_display["Technologies"]:
-                 display_parsed_resume_chunk(skills_data_for_display, 6)
+            if (
+                skills_data_for_display["Programming_Language"]
+                or skills_data_for_display["Frameworks"]
+                or skills_data_for_display["Technologies"]
+            ):
+                display_parsed_resume_chunk(skills_data_for_display, 6)
 
         st.markdown("---")
 
@@ -526,14 +527,12 @@ if st.session_state.show_jd_sections:
     custom_jd_text = st.text_area(
         "Paste a Job Description here:",
         height=80,
-        help="Paste the full job description. If text is entered here, it will be used instead of the dropdown selection."
+        help="Paste the full job description. If text is entered here, it will be used instead of the dropdown selection.",
     )
 
     # Create a dropdown for JD options
     selected_jd_display = st.selectbox(
-        "Or Select a Job Description:",
-        options=list(JD_OPTIONS.keys()),
-        index=0  # Default to the first option
+        "Or Select a Job Description:", options=list(JD_OPTIONS.keys()), index=0  # Default to the first option
     )
 
     # Map the selected display option to its actual JD path
@@ -547,10 +546,10 @@ if st.session_state.show_jd_sections:
         # THIS STEP DOES NOT REQUIRE CHANGES TO BE MADE AT THE BACKEND.
         rand_filename = str(uuid.uuid4())[:8] + ".json"
 
-        jd_path = "../jd_json/"+rand_filename
+        jd_path = "../jd_json/" + rand_filename
 
-        temp_jd_content = {'job_description': custom_jd_text}
-        with open(jd_path, 'w') as f:
+        temp_jd_content = {"job_description": custom_jd_text}
+        with open(jd_path, "w") as f:
             json.dump(temp_jd_content, f, indent=4)
 
         st.session_state.temp_jd_path = jd_path
@@ -575,7 +574,9 @@ if st.session_state.show_jd_sections:
 
             with st.spinner("Evaluating..."):
                 # Pass the placeholder to the evaluate_resume function
-                st.session_state.evaluation_results = evaluate_resume(st.session_state.parsed_resume, jd_path, evaluation_status_messages)
+                st.session_state.evaluation_results = evaluate_resume(
+                    st.session_state.parsed_resume, jd_path, evaluation_status_messages
+                )
 
     elif st.session_state.parsed_resume is None:
         evaluation_status_messages.warning("Please upload and parse a resume first to proceed with evaluation.")
@@ -599,25 +600,19 @@ if st.session_state.evaluation_results:
             st.warning(f"❌ {candidate_name} has been marked as Rejected")
     else:
 
-        #SHOWN WHEN NO DECISION MADE YET
-        col1, col2, col3 = st.columns([1, 1, 2]) # Added a third column for the report button
+        # SHOWN WHEN NO DECISION MADE YET
+        col1, col2, col3 = st.columns([1, 1, 2])  # Added a third column for the report button
 
         with col1:
             if st.button("✅ Accept"):
-                response = requests.post(f"{BACKEND_URL}/store_decision", params={
-                    "name": candidate_name,
-                    "decision": "Accept"
-                })
+                response = requests.post(f"{BACKEND_URL}/store_decision", params={"name": candidate_name, "decision": "Accept"})
                 if response.status_code == 200:
                     st.session_state.decision_made = "Accept"
                     st.rerun()
 
         with col2:
             if st.button("❌ Reject"):
-                response = requests.post(f"{BACKEND_URL}/store_decision", params={
-                    "name": candidate_name,
-                    "decision": "Reject"
-                })
+                response = requests.post(f"{BACKEND_URL}/store_decision", params={"name": candidate_name, "decision": "Reject"})
                 if response.status_code == 200:
                     st.session_state.decision_made = "Reject"
                     st.rerun()

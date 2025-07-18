@@ -1,12 +1,14 @@
-import streamlit as st
-from typing import Dict, Any
 import time
+from typing import Any, Dict
+
+import streamlit as st
+
 
 # --- Helper functions (copy-pasted from app.py for self-containment) ---
 def display_parsed_resume_chunk(chunk_data: Dict[str, Any], chunk_id: int):
     """
-        This helper now accepts the full parsed_resume_data and extracts relevant parts
-        based on the chunk_id for structured display.
+    This helper now accepts the full parsed_resume_data and extracts relevant parts
+    based on the chunk_id for structured display.
     """
 
     if chunk_id == 1:
@@ -94,9 +96,9 @@ def display_final_evaluation_results(evaluation_results):
     st.subheader("Final Resume Evaluation Results Summary")
 
     # Display Overall Scores
-    overall_score = evaluation_results.get('Overall_Score', None)
-    match_with_jd = evaluation_results.get('Match with JD', None)
-    qualification_status = evaluation_results.get('qualification_status', None)
+    overall_score = evaluation_results.get("Overall_Score", None)
+    match_with_jd = evaluation_results.get("Match with JD", None)
+    qualification_status = evaluation_results.get("qualification_status", None)
 
     if overall_score is not None and match_with_jd is not None:
         col_score1, col_score2, col_score3 = st.columns(3)
@@ -115,17 +117,17 @@ def display_final_evaluation_results(evaluation_results):
     st.markdown("#### Detailed Scores ")
     col_ind_score1, col_ind_score2, col_ind_score3 = st.columns(3)
     with col_ind_score1:
-        st.metric(label="Experience Score (0-10)", value=evaluation_results.get('Experience_Score', 'N/A'))
+        st.metric(label="Experience Score (0-10)", value=evaluation_results.get("Experience_Score", "N/A"))
     with col_ind_score2:
-        st.metric(label="Skills Score (0-10)", value=evaluation_results.get('Skills_Score', 'N/A'))
+        st.metric(label="Skills Score (0-10)", value=evaluation_results.get("Skills_Score", "N/A"))
     with col_ind_score3:
-        st.metric(label="Education Score (0-10)", value=evaluation_results.get('Education_Score', 'N/A'))
+        st.metric(label="Education Score (0-10)", value=evaluation_results.get("Education_Score", "N/A"))
 
     # Display Pros and Cons
     st.markdown("---")
     st.markdown("#### Strengths and Areas for Improvement ")
-    pros = evaluation_results.get('Pros', [])
-    cons = evaluation_results.get('Cons', [])
+    pros = evaluation_results.get("Pros", [])
+    cons = evaluation_results.get("Cons", [])
 
     col_pros, col_cons = st.columns(2)
     with col_pros:
@@ -146,9 +148,9 @@ def display_final_evaluation_results(evaluation_results):
     # Display Skills Match
     st.markdown("---")
     st.markdown("#### Skills Match Analysis ")
-    skills_match = evaluation_results.get('Skills Match', [])
-    skills_not_matching = evaluation_results.get('Skills not matching with JD', [])
-    extra_skills = evaluation_results.get('Extra skills', [])
+    skills_match = evaluation_results.get("Skills Match", [])
+    skills_not_matching = evaluation_results.get("Skills not matching with JD", [])
+    extra_skills = evaluation_results.get("Extra skills", [])
 
     if skills_match:
         st.markdown("**Matching Skills:**")
@@ -168,15 +170,16 @@ def display_final_evaluation_results(evaluation_results):
     else:
         st.info("No additional skills beyond JD requirements identified.")
 
+
 # --- Report Page Logic ---
 st.set_page_config(layout="wide", page_title="Resume Evaluation Report")
 
 st.title("Resume Evaluation Report")
 
 # Retrieve data from session state
-evaluation_results = st.session_state.get('report_evaluation_results')
-parsed_resume = st.session_state.get('report_parsed_resume')
-candidate_name = st.session_state.get('report_candidate_name', 'N/A')
+evaluation_results = st.session_state.get("report_evaluation_results")
+parsed_resume = st.session_state.get("report_parsed_resume")
+candidate_name = st.session_state.get("report_candidate_name", "N/A")
 
 if evaluation_results and parsed_resume:
     st.header(f"Report for: {candidate_name}")
@@ -191,7 +194,7 @@ if evaluation_results and parsed_resume:
     st.header("Parsed Resume Details")
     with st.expander("View Full Parsed Resume (Click to Expand)"):
         # Display chunks in order they were received for precise rendering
-        if 'parsed_resume_chunks' in st.session_state and st.session_state.parsed_resume_chunks:
+        if "parsed_resume_chunks" in st.session_state and st.session_state.parsed_resume_chunks:
             for i in sorted(st.session_state.parsed_resume_chunks.keys()):
                 display_parsed_resume_chunk(st.session_state.parsed_resume_chunks[i], i)
         else:
@@ -211,12 +214,14 @@ if evaluation_results and parsed_resume:
             skills_data_for_display = {
                 "Programming_Language": parsed_resume.get("Programming_Language", []),
                 "Frameworks": parsed_resume.get("Frameworks", []),
-                "Technologies": parsed_resume.get("Technologies", [])
+                "Technologies": parsed_resume.get("Technologies", []),
             }
-            if skills_data_for_display["Programming_Language"] or \
-               skills_data_for_display["Frameworks"] or \
-               skills_data_for_display["Technologies"]:
-                 display_parsed_resume_chunk(skills_data_for_display, 6)
+            if (
+                skills_data_for_display["Programming_Language"]
+                or skills_data_for_display["Frameworks"]
+                or skills_data_for_display["Technologies"]
+            ):
+                display_parsed_resume_chunk(skills_data_for_display, 6)
 
 else:
     st.warning("No report data available. Please go back to the main page and perform an evaluation.")

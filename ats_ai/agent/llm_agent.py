@@ -1,16 +1,16 @@
 """
-    Using LLM chaining workflow to parse, evaluate, and validate resume and given job description
-    to create a robust and accurate assessment of a candidate.
-    1. extract_resume_info : Parsing Agent
-    2. evaluate_resume_against_jd : Evaluation Agent
+Using LLM chaining workflow to parse, evaluate, and validate resume and given job description
+to create a robust and accurate assessment of a candidate.
+1. extract_resume_info : Parsing Agent
+2. evaluate_resume_against_jd : Evaluation Agent
 """
 
 import json
 import re
-from langchain_community.llms import Ollama
-from langchain_community.document_loaders import PyMuPDFLoader
+from typing import Any, AsyncGenerator
 
-from typing import AsyncGenerator, Any
+from langchain_community.document_loaders import PyMuPDFLoader
+from langchain_community.llms import Ollama
 
 llm = Ollama(model="llama3.1:8b")
 # base_url="http://host.docker.internal:11434")
@@ -27,8 +27,8 @@ def load_pdf_text(file_path: str) -> str:
 
 async def extract_resume_info(raw_resume_text: str) -> AsyncGenerator[Any, Any]:
     """
-        Parsing Agent LLM.
-        Parse information from resume into JSON
+    Parsing Agent LLM.
+    Parse information from resume into JSON
     """
 
     prompt = f"""
@@ -125,8 +125,8 @@ async def extract_resume_info(raw_resume_text: str) -> AsyncGenerator[Any, Any]:
 
 async def evaluate_resume_against_jd(jd_json: str, resume_data: dict) -> AsyncGenerator[Any, Any]:
     """
-        Evaluation Agent LLM.
-        Evaluate parsed information from resume from JD
+    Evaluation Agent LLM.
+    Evaluate parsed information from resume from JD
     """
 
     prompt = f"""
