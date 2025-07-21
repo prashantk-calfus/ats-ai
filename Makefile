@@ -1,5 +1,6 @@
 .PHONY: local prod make_env install_poetry ui install backend
 
+VERSION:=0.2.2
 PYTHON_VERSION := $(shell awk -F '"' '/^python =/ { print $$2 }' pyproject.toml)
 POETRY_HOME := $(shell echo $$HOME/.local/bin)
 VENV_DIR := .venv
@@ -21,6 +22,12 @@ ui:
 install: make_env
 	poetry install --no-root
 	poetry run pre-commit install
+
+build:
+	docker build --platform linux/amd64 -t ghcr.io/your-github-username/ats_ai_base:$(VERSION) .
+
+push:
+	docker push ghcr.io/your-github-username/ats_ai_base:$(VERSION)
 
 make_env:
 	# Checks if venv is created or not

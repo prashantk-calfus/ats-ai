@@ -23,3 +23,5 @@ COPY ats_ai ./ats_ai
 
 # Create log directory (in case it isn't mounted)
 RUN mkdir -p ..logs
+
+EXPOSE 8000 8501

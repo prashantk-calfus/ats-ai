@@ -1,6 +1,6 @@
 [project]
 name = "ats_ai"
-version = "0.2.0"
+version = "0.2.2"
 description = "AI driven HR app"
 authors = [
     {name = "Ram Dorak",email = "ram.dorak@calfus.com"},
