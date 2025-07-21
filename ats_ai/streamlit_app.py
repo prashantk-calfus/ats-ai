@@ -4,13 +4,13 @@ import json
 import os
 import time
 import uuid
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import requests
 import streamlit as st
-from streamlit.runtime.scriptrunner import add_script_run_ctx
 
 # Assuming these are defined in your project or passed as environment variables
+# Ensure this URL is correct for your backend service
 BACKEND_URL = "http://localhost:8000"
 
 JD_OPTIONS = {
@@ -22,408 +22,286 @@ JD_OPTIONS = {
 }
 
 
-# --- Helper function for structured display of parsed resume chunks ---
-def display_parsed_resume_chunk(chunk_data: Dict[str, Any], chunk_id: int):
+def display_parsed_resume_in_markdown(parsed_resume_data: Dict[str, Any]):
     """
-    This helper now accepts the full parsed_resume_data and extracts relevant parts
-    based on the chunk_id for structured display.
+    Displays the parsed resume information in a user-friendly Markdown format.
     """
+    st.markdown("#### Personal Information")
+    st.write(f"**Name:** {parsed_resume_data.get('Name', 'N/A')}")
 
-    if chunk_id == 1:
-        # Expected: Name, Contact_Details, Github_Repo, LinkedIn
-        name = chunk_data.get("Name", "N/A")
-        contact = chunk_data.get("Contact_Details", {})
-        mobile = contact.get("Mobile_No", "N/A")
-        email = contact.get("Email", "N/A")
-        github = chunk_data.get("Github_Repo", "N/A")
-        linkedin = chunk_data.get("LinkedIn", "N/A")
-
-        st.markdown(f"<h4>{name}</h4", unsafe_allow_html=True)
-        st.markdown(f"**Contact:** Mobile: {mobile}, </br>Email: {email}", unsafe_allow_html=True)
-        st.markdown(f"**Profiles:** GitHub: {github}, </br>LinkedIn: {linkedin}", unsafe_allow_html=True)
-
-    elif chunk_id == 2:
-        # Expected: Education
-        education_list = chunk_data.get("Education", [])
-        if education_list:
-            st.markdown("<h4>Education:</h4>", unsafe_allow_html=True)
-            for edu in education_list:
-                st.markdown(f"- **Degree:** {edu.get('Degree', 'N/A')}")
-                st.markdown(f"  **Institution:** {edu.get('Institution', 'N/A')}")
-                st.markdown(f"  **Score:** {edu.get('Score', 'N/A')}")
-                st.markdown(f"  **Duration:** {edu.get('Duration', 'N/A')}")
-        else:
-            st.info("No education details found.")
-
-    elif chunk_id == 3:
-        # Expected: Professional_Experience
-        experience_list = chunk_data.get("Professional_Experience", [])
-        if experience_list:
-            st.markdown("<h4>Professional Experience:</h4>", unsafe_allow_html=True)
-            for exp in experience_list:
-                st.markdown(f"- **Company:** {exp.get('Company', 'N/A')}")
-                st.markdown(f"  **Role:** {exp.get('Role', 'N/A')}")
-                st.markdown(f"  **Duration:** {exp.get('Duration', 'N/A')}")
-                st.markdown(f"  **Description:** {exp.get('Description', 'N/A')}")
-        else:
-            st.info("No professional experience found.")
-
-    elif chunk_id == 4:
-        # Expected: Projects
-        projects_list = chunk_data.get("Projects", [])
-        if projects_list:
-            st.markdown("<h4>Projects:</h4>", unsafe_allow_html=True)
-            for proj in projects_list:
-                st.markdown(f"- **Project Name:** {proj.get('Project_Name', 'N/A')}")
-                st.markdown(f"  **Description:** {proj.get('Project_Description', 'N/A')}")
-        else:
-            st.info("No projects found.")
-
-    elif chunk_id == 5:
-        # Expected: Certifications
-        certifications_list = chunk_data.get("Certifications", [])
-        if certifications_list:
-            st.markdown("<h4>Certifications:</h4>", unsafe_allow_html=True)
-            for cert in certifications_list:
-                st.markdown(f"- **Authority:** {cert.get('Certification_Authority', 'N/A')}")
-                st.markdown(f"  **Details:** {cert.get('Certification_Details', 'N/A')}")
-        else:
-            st.info("No certifications found.")
-
-    elif chunk_id == 6:
-        # Expected: Programming_Language, Frameworks, Technologies
-        prog_langs = chunk_data.get("Programming_Language", [])
-        frameworks = chunk_data.get("Frameworks", [])
-        technologies = chunk_data.get("Technologies", [])
-
-        st.markdown("<h4>Skills & Technologies:</h4>", unsafe_allow_html=True)
-        if prog_langs:
-            st.markdown(f"- **Programming Languages:** {', '.join(prog_langs)}")
-        if frameworks:
-            st.markdown(f"- **Frameworks/Tools:** {', '.join(frameworks)}")
-        if technologies:
-            st.markdown(f"- **Other Technologies:** {', '.join(technologies)}")
-        if not (prog_langs or frameworks or technologies):
-            st.info("No specific skills/technologies found.")
+    contact_details = parsed_resume_data.get("Contact_Details", {})
+    if contact_details:
+        st.write(f"**Mobile No:** {contact_details.get('Mobile_No', 'N/A')}")
+        st.write(f"**Email:** {contact_details.get('Email', 'N/A')}")
     else:
-        st.write("CHUNK ID", chunk_id)
-        st.warning(f"Unknown resume chunk type (ID: {chunk_id}).")
+        st.write("**Contact Details:** Not provided")
 
-    # st.markdown("---")
-
-
-# --- Helper function for structured display of evaluation chunks ---
-def display_evaluation_chunk(chunk_data: Dict[str, Any], chunk_id: int):
-
-    if chunk_id == 1:
-        # Expected: Scores and Qualification Status
-        exp_score = chunk_data.get("Experience_Score", "N/A")
-        skills_score = chunk_data.get("Skills_Score", "N/A")
-        edu_score = chunk_data.get("Education_Score", "N/A")
-        overall_score = chunk_data.get("Overall_Score", "N/A")
-        match_jd = chunk_data.get("Match with JD", "N/A").strip()
-        status = chunk_data.get("qualification_status", "N/A")
-
-        if not match_jd or match_jd is "NA" or match_jd is "0%":
-            exp_score = skills_score = edu_score = overall_score = "N/A"
-
-        st.markdown("**Evaluation Scores:**")
-        st.write(f"- Experience Score: **{exp_score}/10**")
-        st.write(f"- Skills Score: **{skills_score}/10**")
-        st.write(f"- Education Score: **{edu_score}/10**")
-        st.write(f"- Overall Score: **{overall_score}/10**")
-        st.write(f"- Match with JD: **{match_jd}**")
-        if status == "Qualified":
-            st.success(f"**Qualification Status:** {status}")
-        else:
-            st.error(f"**Qualification Status:** {status}")
-
-    elif chunk_id == 2:
-        # Expected: Pros, Cons
-        pros = chunk_data.get("Pros", [])
-        cons = chunk_data.get("Cons", [])
-
-        col_pros, col_cons = st.columns(2)
-        with col_pros:
-            st.success("##### Strengths (Pros)")
-            if pros:
-                for p in pros:
-                    st.write(f"- {p}")
-            else:
-                st.info("No specific strengths identified.")
-        with col_cons:
-            st.warning("##### Areas for Improvement (Cons)")
-            if cons:
-                for c in cons:
-                    st.write(f"- {c}")
-            else:
-                st.info("No specific weaknesses identified.")
-
-    elif chunk_id == 3:
-        # Expected: Skills Match, Skills not matching with JD, Extra skills
-        skills_match = chunk_data.get("Skills Match", [])
-        skills_not_matching = chunk_data.get("Skills not matching with JD", [])
-        extra_skills = chunk_data.get("Extra skills", [])
-
-        st.markdown("**Detailed Skill Analysis:**")
-        if skills_match:
-            st.markdown(f"- **Matching Skills:** {',  '.join(skills_match)}")
-        if skills_not_matching:
-            st.markdown(f"- **Missing JD Skills:** {',  '.join(skills_not_matching)}")
-        if extra_skills:
-            st.markdown(f"- **Additional Skills:** {',  '.join(extra_skills)}")
-        if not (skills_match or skills_not_matching or extra_skills):
-            st.info("No detailed skill analysis available.")
-    else:
-        st.warning(f"Unknown evaluation chunk type (ID: {chunk_id}).")
+    st.write(f"**GitHub:** {parsed_resume_data.get('Github_Repo', 'N/A')}")
+    st.write(f"**LinkedIn:** {parsed_resume_data.get('LinkedIn', 'N/A')}")
 
     st.markdown("---")
-    time.sleep(0.5)
+    st.markdown("#### Education")
+    education_entries = parsed_resume_data.get("Education", [])
+    if education_entries:
+        for edu in education_entries:
+            st.markdown(f"**{edu.get('Degree', 'N/A')}** at {edu.get('Institution', 'N/A')}")
+            st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;*Score:* {edu.get('Score', 'N/A')}, *Duration:* {edu.get('Duration', 'N/A')}")
+    else:
+        st.info("No education details provided.")
+
+    st.markdown("---")
+    st.markdown("#### Professional Experience")
+    experience_entries = parsed_resume_data.get("Professional_Experience", [])
+    if experience_entries:
+        for exp in experience_entries:
+            st.markdown(f"**{exp.get('Role', 'N/A')}** at **{exp.get('Company', 'N/A')}**")
+            st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;*Duration:* {exp.get('Duration', 'N/A')}")
+            if exp.get("Description", "N/A") != "N/A":
+                st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;*Description:* {exp.get('Description', 'N/A')}")
+    else:
+        st.info("No professional experience details provided.")
+
+    st.markdown("---")
+    st.markdown("#### Projects")
+    project_entries = parsed_resume_data.get("Projects", [])
+    if project_entries and project_entries[0].get("Project_Name", "NA").upper() != "NA":
+        for proj in project_entries:
+            st.markdown(f"**Project Name:** {proj.get('Project_Name', 'N/A')}")
+            st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;*Description:* {proj.get('Project_Description', 'N/A')}")
+    else:
+        st.info("No project details provided.")
+
+    st.markdown("---")
+    st.markdown("#### Certifications")
+    certification_entries = parsed_resume_data.get("Certifications", [])
+    if certification_entries and certification_entries[0].get("Certification_Authority", "NA").upper() != "NA":
+        for cert in certification_entries:
+            st.markdown(f"**Certification:** {cert.get('Certification_Details', 'N/A')}")
+            st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;*Authority:* {cert.get('Certification_Authority', 'N/A')}")
+    else:
+        st.info("No certification details provided.")
+
+    st.markdown("---")
+    st.markdown("#### Technical Skills")
+    prog_lang = parsed_resume_data.get("Programming_Language", [])
+    if prog_lang:
+        st.write(f"**Programming Languages:** {', '.join(prog_lang)}")
+    else:
+        st.write("**Programming Languages:** N/A")
+
+    frameworks = parsed_resume_data.get("Frameworks", [])
+    if frameworks:
+        st.write(f"**Frameworks:** {', '.join(frameworks)}")
+    else:
+        st.write("**Frameworks:** N/A")
+
+    technologies = parsed_resume_data.get("Technologies", [])
+    if technologies:
+        st.write(f"**Technologies:** {', '.join(technologies)}")
+    else:
+        st.write("**Technologies:** N/A")
 
 
-# --- Function to display final evaluation results ---
-def display_final_evaluation_results(evaluation_results):
+def display_final_evaluation_results(evaluation_results: Dict[str, Any]):
     """Display the final evaluation results summary"""
     st.subheader("Final Resume Evaluation Results Summary")
 
-    # Display Overall Scores
-    # overall_score = evaluation_results.get('Overall_Score', None)
-    match_with_jd = evaluation_results.get("Match with JD", None).strip()
-    qualification_status = evaluation_results.get("qualification_status", None)
+    # === Overall Scores ===
+    eval_summary = evaluation_results.get("Evaluation_Summary", {})
+    match_with_jd = eval_summary.get("Match_Percentage", "N/A").strip()
+    qualification_status = eval_summary.get("Qualification_Status", "N/A")
+    exp_score = eval_summary.get("Experience_Score", "N/A")
+    skills_score = eval_summary.get("Skills_Score", "N/A")
+    edu_score = eval_summary.get("Education_Score", "N/A")
+    projects_score = eval_summary.get("Projects_Score", "N/A")  # Added projects score
+    overall_score = eval_summary.get("Overall_Weighted_Score", "N/A")
 
-    exp_score = evaluation_results.get("Experience_Score", "N/A")
-    skills_score = evaluation_results.get("Skills_Score", "N/A")
-    edu_score = evaluation_results.get("Education_Score", "N/A")
+    col_score1, col_score2, col_score3 = st.columns(3)
+    with col_score1:
+        st.metric(label=" Overall Score (0-10)", value=overall_score)
+    with col_score2:
+        st.metric(label=" Match with JD", value=match_with_jd)
+    with col_score3:
+        if qualification_status == "Qualified":
+            st.success(f" Status: {qualification_status}")
+        else:
+            st.error(f" Status: {qualification_status}")
 
-    if not match_with_jd or match_with_jd is "NA" or match_with_jd is "0%":
-        exp_score = skills_score = edu_score = "N/A"
-        overall_score = "N/A"
-
-    overall_score = evaluation_results.get("Overall_Score", "N/A")
-
-    if overall_score is not None and match_with_jd is not None:
-        col_score1, col_score2, col_score3 = st.columns(3)
-        with col_score1:
-            st.metric(label="Overall Score (0-10)", value=overall_score)
-        with col_score2:
-            st.metric(label="Match with JD", value=match_with_jd)
-        with col_score3:
-            if qualification_status == "Qualified":
-                st.success(f"**Status:** {qualification_status}")
-            else:
-                st.error(f"**Status:** {qualification_status}")
-
-    # Display individual scores
+    # === Individual Scores ===
     st.markdown("---")
-    st.markdown("#### Detailed Scores ")
+    st.markdown("#### Detailed Scores")
 
-    col_ind_score1, col_ind_score2, col_ind_score3 = st.columns(3)
+    col_ind_score1, col_ind_score2, col_ind_score3, col_ind_score4 = st.columns(4)  # Added a column for projects score
     with col_ind_score1:
         st.metric(label="Experience Score (0-10)", value=exp_score)
     with col_ind_score2:
         st.metric(label="Skills Score (0-10)", value=skills_score)
     with col_ind_score3:
         st.metric(label="Education Score (0-10)", value=edu_score)
+    with col_ind_score4:
+        st.metric(label="Projects Score (0-10)", value=projects_score)
 
-    # Display Pros and Cons
+    # === Pros and Cons ===
     st.markdown("---")
-    st.markdown("#### Strengths and Areas for Improvement ")
-    pros = evaluation_results.get("Pros", [])
-    cons = evaluation_results.get("Cons", [])
+    st.markdown("#### Strengths and Areas for Improvement")
+
+    pros_and_cons = evaluation_results.get("Strengths_and_Weaknesses", {})
+    pros = pros_and_cons.get("Pros", [])
+    cons = pros_and_cons.get("Cons", [])
 
     col_pros, col_cons = st.columns(2)
     with col_pros:
-        st.success("##### Strengths (Pros)")
+        st.success("##### Strengths")
         if pros:
             for p in pros:
                 st.write(f"- {p}")
         else:
             st.info("No specific strengths identified.")
+
     with col_cons:
-        st.warning("##### Areas for Improvement (Cons)")
+        st.warning("##### Weaknesses")
         if cons:
             for c in cons:
                 st.write(f"- {c}")
         else:
             st.info("No specific weaknesses identified.")
 
-    # Display Skills Match
+    # === Skills Match ===
     st.markdown("---")
-    st.markdown("#### Skills Match Analysis ")
-    skills_match = evaluation_results.get("Skills Match", [])
-    skills_not_matching = evaluation_results.get("Skills not matching with JD", [])
-    extra_skills = evaluation_results.get("Extra skills", [])
-    no_skill_match_flag = 0
+    st.markdown("#### Skills Match Analysis")
+
+    skill_analysis = evaluation_results.get("Skill_Analysis", {})
+    skills_match = skill_analysis.get("Skills Match", [])
+    skills_not_matching = skill_analysis.get("Required_Skills_Missing_from_Resume", [])
+    extra_skills = skill_analysis.get("Extra skills", [])  # This alias is expected from the LLM JSON, so keep it.
 
     if skills_match:
         st.markdown("**Matching Skills:**")
-        st.write(", ".join(skills_match))
+        st.info(",\n ".join(skills_match))
     else:
-        st.info("No direct skill matches found.")
-        no_skill_match_flag = 1
+        st.warning("No direct skill matches found.")
 
     if skills_not_matching:
-        st.markdown("**Skills Required by JD but Missing:**")
-        st.warning(", ".join(skills_not_matching))
-    elif no_skill_match_flag:
-        st.success("No skill matches found.")
+        st.markdown("**Missing Skills (from JD):**")
+        st.warning(",\n ".join(skills_not_matching))
 
     if extra_skills:
-        st.markdown("**Additional Skills Candidate Has:**")
-        st.info(", ".join(extra_skills))
+        st.markdown("** Extra Skills (beyond JD):**")
+        st.info(",\n ".join(extra_skills))
     else:
         st.info("No additional skills beyond JD requirements identified.")
 
+    # === Key Considerations ===
+    st.markdown("---")
+    st.markdown("####  Key Considerations")
 
-# --- Modified backend communication functions ---
-def upload_resume(file, live_parsing_status_placeholder) -> Optional[Dict[str, Any]]:
-    st.session_state.parsed_resume_chunks = {}  # Initialize to store chunks for expander display
+    key_considerations = evaluation_results.get("Key_Considerations", {})
+    kpis = key_considerations.get("Quantifiable_Achievements_Identified", [])
+    red_flags = key_considerations.get("Red_Flags_Noted", [])
+    overall_recommendation = key_considerations.get("Overall_Recommendation", "N/A")
+
+    if kpis:
+        st.markdown("** Quantifiable Achievements:**")
+        for kpi in kpis:
+            st.markdown(f"- {kpi}")
+    else:
+        st.info("No quantifiable achievements noted.")
+
+    if red_flags:
+        st.markdown("** Red Flags:**")
+        for flag in red_flags:
+            st.warning(f"- {flag}")
+    else:
+        st.success("No red flags identified.")
+
+    if overall_recommendation and overall_recommendation != "N/A":
+        st.markdown("** Final Recommendation:**")
+        st.markdown(f"- {overall_recommendation}")
+
+
+# --- Backend Communication Functions ---
+
+
+def upload_resume_file_to_backend(file, status_placeholder) -> Optional[str]:
+    """
+    Uploads the resume PDF to the backend and returns the filename if successful.
+    The backend saves the file and does NOT return parsed data here.
+    """
     try:
-        file.seek(0)
+        file.seek(0)  # Ensure file pointer is at the beginning
         files = {"resume_file": (file.name, file.getvalue(), file.type)}
+        status_placeholder.info(f"Uploading `{file.name}` to backend...")
         upload_response = requests.post(f"{BACKEND_URL}/upload_resume_file", files=files)
 
-        if upload_response.status_code == 200 and upload_response.json().get("message") == "Resume uploaded successfully":
-            live_parsing_status_placeholder.success("Resume uploaded successfully! Parsing in progress...")
-
-            stream_url = f"{BACKEND_URL}/resume_parser"
-            params = {"resume_path": file.name}
-
-            merged_json = {}
-            decoder = json.JSONDecoder()
-            buffer = ""
-            chunk_count = 0
-
-            # Create an empty placeholder to update live parsing. This is where chunks will appear and then be cleared.
-            live_parsing_display_placeholder = st.empty()
-
-            with requests.get(stream_url, params=params, stream=True, timeout=180) as resp:
-                resp.raise_for_status()
-
-                for line in resp.iter_lines(decode_unicode=True):
-                    if not line or not line.strip():
-                        continue
-
-                    buffer += line.strip()
-                    # st.write(buffer)
-
-                    while "---END_OF_JSON_CHUNK--" in buffer:
-                        buffer, _, remaining_buffer = buffer.partition("---END_OF_JSON_CHUNK--")
-
-                    while buffer:
-                        try:
-                            parsed_obj, idx = decoder.raw_decode(buffer)
-                            merged_json.update(parsed_obj)
-                            buffer = buffer[idx:].lstrip()
-                            chunk_count += 1
-
-                            st.session_state.parsed_resume_chunks[chunk_count] = parsed_obj
-
-                            # --- Display live parsing progress within the placeholder ---
-                            with live_parsing_display_placeholder.container():
-                                # st.subheader("Parsing results...")
-                                # st.info("Displaying parsed resume sections as they arrive from the backend...")
-                                display_parsed_resume_chunk(parsed_obj, chunk_count)
-                            time.sleep(0.5)
-
-                        except json.JSONDecodeError:
-                            break
-                        except Exception as e:
-                            live_parsing_status_placeholder.warning(
-                                f"Error decoding JSON chunk during parsing: {e} - Line: '{line.strip()}'"
-                            )
-                            buffer = ""
-                            break
-
-            live_parsing_display_placeholder.empty()  # Clear the live display after all chunks are received
-            live_parsing_status_placeholder.success("Resume parsing complete! View details in the dropdown below.")
-            return merged_json
-
+        if upload_response.status_code == 200:
+            response_data = upload_response.json()
+            if response_data.get("message") == "Resume uploaded successfully":
+                status_placeholder.success(f"Resume uploaded: `{file.name}`")
+                return file.name
+            else:
+                status_placeholder.error(f"Upload failed: {response_data.get('message', 'Unknown error')}")
+                return None
         else:
-            live_parsing_status_placeholder.error(f"Upload failed: {upload_response.status_code} - {upload_response.text}")
+            status_placeholder.error(f"Backend upload error: Status {upload_response.status_code} - {upload_response.text}")
             return None
-
     except requests.exceptions.RequestException as req_err:
-        live_parsing_status_placeholder.error(f"Network or backend error during upload/parsing: {req_err}")
+        status_placeholder.error(f"Network or backend connection error during upload: {req_err}")
         return None
     except Exception as e:
-        live_parsing_status_placeholder.error(f"An unexpected error occurred during upload/parsing: {str(e)}")
+        status_placeholder.error(f"An unexpected error occurred during upload: {str(e)}")
         return None
 
 
-def evaluate_resume(parsed_data: Dict[str, Any], jd_path: str, evaluation_status_placeholder) -> Optional[Dict[str, Any]]:
-    """Send evaluation request to backend"""
+def parse_resume_from_backend(resume_filename: str, status_placeholder) -> Optional[Dict[str, Any]]:
+    """
+    Sends a request to the backend's /resume_parser endpoint to get the parsed resume JSON.
+    """
+    try:
+        status_placeholder.info(f"Requesting parsing for `{resume_filename}` from backend...")
+        # Note: The backend's /resume_parser expects the filename as a query parameter
+        parse_response = requests.get(f"{BACKEND_URL}/resume_parser", params={"resume_path": resume_filename})
+
+        if parse_response.status_code == 200:
+            parsed_data = parse_response.json()
+            status_placeholder.success(f"Resume parsed successfully for `{resume_filename}`.")
+            return parsed_data
+        else:
+            status_placeholder.error(f"Backend parsing error: Status {parse_response.status_code} - {parse_response.text}")
+            return None
+    except requests.exceptions.RequestException as req_err:
+        status_placeholder.error(f"Network or backend connection error during parsing: {req_err}")
+        return None
+    except Exception as e:
+        status_placeholder.error(f"An unexpected error occurred during parsing: {str(e)}")
+        return None
+
+
+def evaluate_resume_with_backend(
+    parsed_data: Dict[str, Any], jd_path: str, evaluation_status_placeholder
+) -> Optional[Dict[str, Any]]:
+    """Sends evaluation request to backend"""
     try:
         if not parsed_data:
             evaluation_status_placeholder.warning("No parsed resume data available for evaluation.")
             return None
 
-        payload = {"resume_json": parsed_data, "jd_path": jd_path}
+        payload = {
+            "resume_json": parsed_data,
+            "jd_path": jd_path,  # This should be the path to the JD file on the backend's accessible file system
+        }
 
         evaluation_status_placeholder.info(f"Sending evaluation request with JD: `{jd_path}`....")
 
-        # with st.expander("Payload sent to Backend (for debugging)"):
-        #     st.json(payload)
+        eval_response = requests.post(f"{BACKEND_URL}/evaluate_resume", json=payload)
 
-        merged_json = {}
-        decoder = json.JSONDecoder()
-        buffer = ""
-        chunk_count = 0
+        if eval_response.status_code == 200:
+            return eval_response.json()
+        else:
+            evaluation_status_placeholder.error(
+                f"Backend responded with an error during evaluation: Status {eval_response.status_code} - {eval_response.text}"
+            )
+            return None
 
-        live_evaluation_display_placeholder = st.empty()
-
-        with requests.post(f"{BACKEND_URL}/evaluate_resume", json=payload, stream=True, timeout=180) as resp:
-            resp.raise_for_status()
-
-            for line in resp.iter_lines(decode_unicode=True):
-                if not line or not line.strip():
-                    continue
-
-                buffer += line.strip()
-
-                while "---END_OF_JSON_CHUNK--" in buffer:
-                    buffer, _, remaining_buffer = buffer.partition("---END_OF_JSON_CHUNK--")
-
-                while buffer:
-                    try:
-                        parsed_obj, idx = decoder.raw_decode(buffer)
-                        merged_json.update(parsed_obj)
-                        buffer = buffer[idx:].lstrip()
-                        chunk_count += 1
-
-                        # --- Call helper function to display evaluation chunk ---
-                        with live_evaluation_display_placeholder.container():
-                            st.subheader("Live Evaluation Progress:")
-                            st.info("Displaying evaluation results as they arrive from the backend...")
-                            display_evaluation_chunk(parsed_obj, chunk_count)
-                        time.sleep(0.5)
-
-                    except json.JSONDecodeError:
-                        break
-                    except Exception as e:
-                        evaluation_status_placeholder.warning(
-                            f"Error decoding JSON chunk during evaluation: {e} - Line: '{line.strip()}'"
-                        )
-                        buffer = ""
-                        break
-
-            if st.session_state.temp_jd_path and os.path.exists(st.session_state.temp_jd_path):
-                try:
-                    os.remove(st.session_state.temp_jd_path)
-                    evaluation_status_placeholder.success(
-                        f"Cleaned up temporary JD file: `{os.path.basename(st.session_state.temp_jd_path)}`"
-                    )
-                    st.session_state.temp_jd_path = None
-                except Exception as e:
-                    evaluation_status_placeholder.warning(
-                        f"Could not delete temporary JD file `{st.session_state.temp_jd_path}`: {e}"
-                    )
-
-        # Clear live evaluation display after completion
-        live_evaluation_display_placeholder.empty()
-        evaluation_status_placeholder.success("Resume evaluation complete!")
-
-        return merged_json
     except requests.exceptions.RequestException as req_err:
         evaluation_status_placeholder.error(f"Network or backend error during evaluation: {req_err}")
         return None
@@ -432,16 +310,18 @@ def evaluate_resume(parsed_data: Dict[str, Any], jd_path: str, evaluation_status
         return None
 
 
-# --- Streamlit Frontend (main app structure remains the same) ---
+# --- Streamlit Frontend (main app structure) ---
 st.set_page_config(layout="wide", page_title="Resume Analyzer")
 
 st.title("Resume Analyzer and Evaluator")
 
-# Session state to store parsed and evaluated data
+# Initialize session state variables
+if "uploaded_resume_filename" not in st.session_state:
+    st.session_state.uploaded_resume_filename = None  # To store the filename after upload
 if "parsed_resume" not in st.session_state:
     st.session_state.parsed_resume = None
-if "parsed_resume_chunks" not in st.session_state:
-    st.session_state.parsed_resume_chunks = {}
+if "personal_details" not in st.session_state:
+    st.session_state.personal_details = None
 if "evaluation_results" not in st.session_state:
     st.session_state.evaluation_results = None
 if "show_jd_sections" not in st.session_state:
@@ -452,71 +332,47 @@ if "temp_jd_path" not in st.session_state:
     st.session_state.temp_jd_path = None
 
 
-# --- Section 1: Upload Resume ---
-st.header("1. Upload Resume")
-uploaded_file = st.file_uploader("Choose a resume file (PDF, DOCX)", type=["pdf", "docx"])
+# --- Section 1: Upload and Parse Resume ---
+st.header("1. Upload and Parse Resume")
+uploaded_file = st.file_uploader("Choose a resume file (PDF)", type=["pdf"])
 
 # Placeholder for messages during upload/parsing
 parsing_status_messages = st.empty()
 
 if uploaded_file is not None:
-    if st.button("Display Resume"):
-        # Clear states of previous sessions
+    if st.button("Process Resume", key="process_resume_btn"):  # Changed button text
+        # Clear states of previous sessions when a new resume is processed
+        st.session_state.uploaded_resume_filename = None
         st.session_state.parsed_resume = None
         st.session_state.evaluation_results = None
         st.session_state.show_jd_sections = False
-        st.session_state.parsed_resume_chunks = {}
         st.session_state.decision_made = None
+        st.session_state.temp_jd_path = None
 
-        with st.spinner("Parsing for display..."):
-            # Pass the placeholder to the upload_resume function
-            parsed_data = upload_resume(uploaded_file, parsing_status_messages)
-            st.session_state.parsed_resume = parsed_data
+        with st.spinner("Uploading resume..."):
+            uploaded_filename = upload_resume_file_to_backend(uploaded_file, parsing_status_messages)
+            st.session_state.uploaded_resume_filename = uploaded_filename
 
-            if st.session_state.parsed_resume:
-                st.session_state.show_jd_sections = True
-            else:
-                st.session_state.show_jd_sections = False
+        if st.session_state.uploaded_resume_filename:
+            with st.spinner("Parsing resume with LLM..."):
+                parsed_data = parse_resume_from_backend(st.session_state.uploaded_resume_filename, parsing_status_messages)
+                st.session_state.parsed_resume = parsed_data
+
+                if st.session_state.parsed_resume:
+                    st.session_state.show_jd_sections = True
+                    parsing_status_messages.success("Resume processed and parsed successfully!")
+                else:
+                    st.session_state.show_jd_sections = False
+                    parsing_status_messages.error("Failed to parse resume after upload.")
+        else:
+            parsing_status_messages.error("Resume upload failed. Cannot proceed with parsing.")
 
 
 # --- Collapsible Parsed Resume Section ---
 if st.session_state.parsed_resume:
-    with st.expander("View Resume Information (Click to Expand)"):
-        if st.session_state.parsed_resume_chunks:
-            # Display chunks in order they were received for precise rendering
-            for i in sorted(st.session_state.parsed_resume_chunks.keys()):
-                display_parsed_resume_chunk(st.session_state.parsed_resume_chunks[i], i)
-
-        # THIS PART WONT BE NEEDED
-        else:
-            st.warning("No detailed chunks stored, displaying full parsed resume JSON structure.")
-            # Fallback if chunks weren't stored (e.g., direct assign for testing)
-            # This part displays the full JSON structure by iterating over common sections.
-            if st.session_state.parsed_resume.get("Name") or st.session_state.parsed_resume.get("Contact_Details"):
-                display_parsed_resume_chunk(st.session_state.parsed_resume, 1)
-            if st.session_state.parsed_resume.get("Education"):
-                display_parsed_resume_chunk(st.session_state.parsed_resume, 2)
-            if st.session_state.parsed_resume.get("Professional_Experience"):
-                display_parsed_resume_chunk(st.session_state.parsed_resume, 3)
-            if st.session_state.parsed_resume.get("Projects"):
-                display_parsed_resume_chunk(st.session_state.parsed_resume, 4)
-            if st.session_state.parsed_resume.get("Certifications"):
-                display_parsed_resume_chunk(st.session_state.parsed_resume, 5)
-
-            # For skills, combine and pass them as one logical chunk
-            skills_data_for_display = {
-                "Programming_Language": st.session_state.parsed_resume.get("Programming_Language", []),
-                "Frameworks": st.session_state.parsed_resume.get("Frameworks", []),
-                "Technologies": st.session_state.parsed_resume.get("Technologies", []),
-            }
-            if (
-                skills_data_for_display["Programming_Language"]
-                or skills_data_for_display["Frameworks"]
-                or skills_data_for_display["Technologies"]
-            ):
-                display_parsed_resume_chunk(skills_data_for_display, 6)
-
-        st.markdown("---")
+    with st.expander("View Parsed Resume Information (Click to Expand)"):  # Changed expander title
+        display_parsed_resume_in_markdown(st.session_state.parsed_resume)
+    st.markdown("---")
 
 
 # --- Section 2 & 3: Conditional Display ---
@@ -535,31 +391,29 @@ if st.session_state.show_jd_sections:
         "Or Select a Job Description:", options=list(JD_OPTIONS.keys()), index=0  # Default to the first option
     )
 
-    # Map the selected display option to its actual JD path
-    jd_path = JD_OPTIONS[selected_jd_display]
-    st.session_state.temp_jd_path = None
-
-    # st.info(f"Selected JD path: `{jd_path}`")
-
-    if custom_jd_text is not None and len(custom_jd_text.strip()) > 50:
-        # WE NEED TO SAVE THE ADDED JD IN TEXT FORMAT TO PROPER JSON FILE FOR EVALUATION
-        # THIS STEP DOES NOT REQUIRE CHANGES TO BE MADE AT THE BACKEND.
+    # Determine the JD path to send to the backend
+    jd_path_to_use = None
+    if custom_jd_text and len(custom_jd_text.strip()) > 50:
+        # Save custom JD to a temporary file on the frontend's machine.
+        # This file will then be referenced by its absolute path.
         rand_filename = str(uuid.uuid4())[:8] + ".json"
-
-        jd_path = "../jd_json/" + rand_filename
+        temp_jd_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "jd_json_temp"))
+        os.makedirs(temp_jd_dir, exist_ok=True)
+        jd_file_path = os.path.join(temp_jd_dir, rand_filename)
 
         temp_jd_content = {"job_description": custom_jd_text}
-        with open(jd_path, "w") as f:
+        with open(jd_file_path, "w") as f:
             json.dump(temp_jd_content, f, indent=4)
 
-        st.session_state.temp_jd_path = jd_path
-        st.info("Detected JD in Text Format...")
-
+        st.session_state.temp_jd_path = jd_file_path  # Store full path for potential cleanup
+        jd_path_to_use = jd_file_path  # Pass the absolute path to the backend
+        st.info(f"Using custom JD from text.")
     elif selected_jd_display != "Select a pre-existing JD":
-        jd_path = JD_OPTIONS[selected_jd_display]
-        st.info(f"Selected JD path: `{jd_path}`")
+        # For pre-existing JDs, pass the filename. Backend will resolve it from its JD_UPLOAD_FOLDER.
+        jd_path_to_use = JD_OPTIONS[selected_jd_display]
+        st.info(f"Selected pre-existing JD: `{jd_path_to_use}`")
     else:
-        st.info("Please paste a JD or select one in the dropdown.")
+        st.info("Please paste a JD or select one from the dropdown to proceed.")
 
     # --- Section 3: Evaluate Resume against JD ---
     st.header("3. Evaluate Resume against JD")
@@ -567,16 +421,27 @@ if st.session_state.show_jd_sections:
     # Placeholder for messages during evaluation
     evaluation_status_messages = st.empty()
 
-    if st.session_state.parsed_resume is not None and jd_path and jd_path != "Select a pre-existing JD":
-        if st.button("Evaluate Resume"):
+    if st.session_state.parsed_resume is not None and jd_path_to_use:
+        if st.button("Evaluate Resume", key="evaluate_resume_btn"):
             # Clear previous decision when re-evaluating
             st.session_state.decision_made = None
 
             with st.spinner("Evaluating..."):
-                # Pass the placeholder to the evaluate_resume function
-                st.session_state.evaluation_results = evaluate_resume(
-                    st.session_state.parsed_resume, jd_path, evaluation_status_messages
+                # Store personal details separately for the report page.
+                personal_details_keys = ["Name", "Contact_Details", "Github_Repo", "LinkedIn"]
+                st.session_state.personal_details = {
+                    key: st.session_state.parsed_resume.get(key) for key in personal_details_keys
+                }
+
+                st.session_state.evaluation_results = evaluate_resume_with_backend(
+                    st.session_state.parsed_resume,  # Send the full parsed resume to backend
+                    jd_path_to_use,  # Send the determined JD path
+                    evaluation_status_messages,
                 )
+                if st.session_state.evaluation_results:
+                    evaluation_status_messages.success("Resume evaluation complete!")
+                else:
+                    evaluation_status_messages.error("Resume evaluation failed. Check backend logs for details.")
 
     elif st.session_state.parsed_resume is None:
         evaluation_status_messages.warning("Please upload and parse a resume first to proceed with evaluation.")
@@ -587,44 +452,52 @@ if st.session_state.show_jd_sections:
 # --- Display Final Evaluation Results (Outside of button logic) ---
 if st.session_state.evaluation_results:
     display_final_evaluation_results(st.session_state.evaluation_results)
-    # st.json(st.session_state.parsed_resume)
 
     # Accept/Reject buttons
-    candidate_name = st.session_state.parsed_resume.get("Name", "Unknown")
+    candidate_name = (
+        st.session_state.personal_details.get("Name") if st.session_state.personal_details else None
+    ) or st.session_state.parsed_resume.get("Name", "Unknown")
 
     # Display decision status if already made
     if st.session_state.decision_made:
         if st.session_state.decision_made == "Accept":
-            st.success(f"✅ {candidate_name} has been marked as Accepted")
+            st.success(f" **{candidate_name}** has been marked as **Accepted**!")
         else:
-            st.warning(f"❌ {candidate_name} has been marked as Rejected")
+            st.warning(f" **{candidate_name}** has been marked as **Rejected**!")
     else:
-
-        # SHOWN WHEN NO DECISION MADE YET
+        # Shown when no decision made yet
         col1, col2, col3 = st.columns([1, 1, 2])  # Added a third column for the report button
 
         with col1:
-            if st.button("✅ Accept"):
+            if st.button("✅ Accept", key="accept_btn"):
                 response = requests.post(f"{BACKEND_URL}/store_decision", params={"name": candidate_name, "decision": "Accept"})
                 if response.status_code == 200:
                     st.session_state.decision_made = "Accept"
                     st.rerun()
+                else:
+                    st.error(f"Failed to store decision: {response.text}")
 
         with col2:
-            if st.button("❌ Reject"):
+            if st.button("❌ Reject", key="reject_btn"):
                 response = requests.post(f"{BACKEND_URL}/store_decision", params={"name": candidate_name, "decision": "Reject"})
                 if response.status_code == 200:
                     st.session_state.decision_made = "Reject"
                     st.rerun()
+                else:
+                    st.error(f"Failed to store decision: {response.text}")
 
         with col3:
             # Generate Report Button
-            if st.button("Generate Report 📄"):
+            if st.button("Generate Report", key="generate_report_btn"):
                 # Store data in session state for the report page
                 st.session_state.report_evaluation_results = st.session_state.evaluation_results
                 st.session_state.report_parsed_resume = st.session_state.parsed_resume
-                st.session_state.report_candidate_name = candidate_name
-                # Navigate to the report page
+                # Ensure personal_details is set before navigating
+                personal_details_keys = ["Name", "Contact_Details", "Github_Repo", "LinkedIn"]
+                st.session_state.report_personal_details = {
+                    key: st.session_state.parsed_resume.get(key) for key in personal_details_keys
+                }
+                # Navigate to the report page - ensure 'pages/report_page.py' exists relative to your app's root
                 st.switch_page("pages/report_page.py")
 
 else:

@@ -6,9 +6,7 @@ None/
 .DS_Store/
 
 # Data Folder
-data
 jd
-jd_json
 
 # Test files
 .coverage
@@ -22,7 +20,8 @@ venv/
 ENV/
 env.bak/
 venv.bak/
-.venv/
+.DS_Store
+.pre-commit-config.yaml
 
 # Log Dir
 .logs/

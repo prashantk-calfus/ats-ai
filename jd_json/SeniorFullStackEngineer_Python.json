@@ -1,0 +1,32 @@
+{
+  "Job_Title": "Senior Full-Stack Engineer",
+  "Required_Skills": [
+    "Python",
+    "Flask",
+    "Django",
+    "FastAPI",
+    "React",
+    "Angular",
+    "Vue.js"
+  ],
+  "Preferred_Skills": [
+    "GenAI",
+    "LLMs",
+    "Transformers",
+    "RAG pipelines"
+  ],
+  "Minimum_Experience": "5-8 years",
+  "Location": "",
+  "Responsibilities": [
+    "Design, build, and maintain robust, scalable web applications using Python (Flask, Django, FastAPI) on the backend and modern frontend frameworks like React, Angular, or Vue.js.",
+    "Collaborate with AI teams to integrate or explore LLMs and generative AI capabilities into products.",
+    "Contribute to architectural decisions ensuring systems are secure, maintainable, and cloud-native.",
+    "Deploy, monitor, and optimize applications using AWS, GCP, or Azure, with a focus on performance and reliability.",
+    "Mentor junior developers and support peer growth.",
+    "Participate in code reviews, maintain high-quality code standards, and contribute to continuous improvement."
+  ],
+  "Qualifications": [
+    "Bachelor's or Master's in Computer Science, Engineering, or a related field"
+  ],
+  "Domain": "Software Development"
+}

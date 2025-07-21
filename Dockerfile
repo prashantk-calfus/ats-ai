@@ -5,7 +5,7 @@ RUN apt-get update && apt-get install -y curl build-essential && rm -rf /var/lib
 
 # Install Poetry
 ENV POETRY_VERSION=1.8.2
-RUN curl -sSL https://install.python-poetry.org | python3 -
+RUN pip3 install poetry
 ENV PATH="/root/.local/bin:$PATH"
 
 # Set workdir
@@ -27,4 +27,4 @@ RUN chmod +x start.sh
 RUN mkdir -p ..logs
 
 # Start both apps
-# CMD ["./start.sh"]
+CMD ["./start.sh"]

@@ -1,19 +1,39 @@
-import asyncio
 import json
 import os
 import shutil
-from typing import Iterable
+from typing import Any, Dict
 
-from agent.llm_agent import evaluate_resume_against_jd, extract_resume_info
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from langchain_community.document_loaders import PyMuPDFLoader
-from models.server_models_schema import ResumeEvaluationRequest
-from sse_starletter.see import EventSourceResponse
+from pydantic import BaseModel
 from starlette import status
-from starlette.responses import FileResponse, StreamingResponse
 
-RESUME_UPLOAD_FOLDER = "../data/"
-JD_UPLOAD_FOLDER = "../jd_json/"
+from ats_ai.agent.llm_agent import evaluate_resume_against_jd, extract_resume_info
+
+RESUME_UPLOAD_FOLDER = "data/"
+JD_UPLOAD_FOLDER = "jd_json/"
+
+
+class ResumeEvaluationRequest(BaseModel):
+    resume_json: Dict[str, Any]
+    jd_path: str
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "resume_json": {
+                        "name": "John Doe",
+                        "email": "john.doe@example.com",
+                        "experience": [{"title": "Software Engineer", "company": "Tech Corp", "years": "2020-Present"}],
+                        "skills": ["Python", "FastAPI", "Docker"],
+                    },
+                    "jd_path": "software_engineer_v1.json",
+                }
+            ]
+        }
+    }
+
 
 app = FastAPI(title="Resume Parsing & Evaluation")
 
@@ -37,7 +57,11 @@ async def upload_resume_file(resume_file: UploadFile = File(...)):
     if not resume_file.filename.endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF format supported")
 
-    file_path = os.path.join(RESUME_UPLOAD_FOLDER, resume_file.filename)
+    if os.path.exists(RESUME_UPLOAD_FOLDER):
+        file_path = os.path.join(RESUME_UPLOAD_FOLDER, resume_file.filename)
+    else:
+        os.makedirs(RESUME_UPLOAD_FOLDER, exist_ok=True)
+        file_path = os.path.join(RESUME_UPLOAD_FOLDER, resume_file.filename)
 
     with open(file_path, "wb") as f:
         shutil.copyfileobj(resume_file.file, f)
@@ -60,7 +84,9 @@ async def resume_parser(resume_path: str):
     raw_resume_text = load_pdf_text(RESUME_UPLOAD_FOLDER + resume_path)
 
     try:
-        return StreamingResponse(extract_resume_info(raw_resume_text), media_type="text/plain")
+        response = await extract_resume_info(raw_resume_text)
+
+        return response
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to start LLM parsing stream: {e}")
 
@@ -79,14 +105,8 @@ async def evaluate_resume(payload: ResumeEvaluationRequest):
 
     # Calls Evaluation LLM in llm_chain_agent.py
     try:
-        return StreamingResponse(evaluate_resume_against_jd(jd_json, resume_json), media_type="text/plain")
+        response = await evaluate_resume_against_jd(jd_json, resume_json)
+
+        return response
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to start LLM evaluation stream: {e}")
-
-
-@app.post("/store_decision", status_code=status.HTTP_200_OK)
-def store_decision(name: str, decision: str):
-
-    # PLACEHOLDER (REPLACE WITH SQLITE TABLE UPDATE IN FUTURE)
-    print(f"Storing decision for {name}: {decision}")
-    return {"status": "success", "message": f"Decision stored for {name}"}
