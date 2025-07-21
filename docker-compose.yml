@@ -1,25 +1,26 @@
 
 services:
-# ollama:
-#   image: ollama/ollama
-#   container_name: ollama
-#   restart: always
-#   ports:
-#     - "11434:11434"
+  backend:
+    image: ats_ai_base
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ats_fastapi
+    command: poetry run uvicorn ats_ai.app_server:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/ats_ai
+    restart: unless-stopped
+    environment:
+      - GEMINI_API_KEY=AIzaSyDtMrdlbdmu4AQmqnPH3rzrsk1USgdnrPo
 
- app:
-  build:
-    context: .
-    dockerfile: Dockerfile
-  container_name: ats_ai
-  command: ./start.sh
-  ports:
-    - "8000:8000"   # FastAPI
-    - "8501:8501"   # Streamlit
-  volumes:
-    - .:/ats_ai        # Mount local code and ..logs
-  restart: unless-stopped
-#  depends_on:
-#    - ollama
-#  environment:
-#    - OLLAMA_HOST=http://ollama:11434
+  ui:
+    image: ats_ai_base
+    container_name: ats_streamlit
+    command: poetry run streamlit run ats_ai/streamlit_app.py --server.port 8501
+    ports:
+      - "8501:8501"
+    volumes:
+      - .:/ats_ai
+    restart: unless-stopped

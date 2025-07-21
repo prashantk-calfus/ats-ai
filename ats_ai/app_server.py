@@ -3,10 +3,12 @@ import os
 import shutil
 from typing import Any, Dict
 
+import uvicorn
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from langchain_community.document_loaders import PyMuPDFLoader
 from pydantic import BaseModel
 from starlette import status
+from starlette.responses import RedirectResponse
 
 from ats_ai.agent.llm_agent import evaluate_resume_against_jd, extract_resume_info
 
@@ -82,16 +84,14 @@ async def resume_parser(resume_path: str):
     Calls the LLM service to get the asynchronous generator.
     """
     raw_resume_text = load_pdf_text(RESUME_UPLOAD_FOLDER + resume_path)
-
     try:
         response = await extract_resume_info(raw_resume_text)
-
         return response
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to start LLM parsing stream: {e}")
 
 
-@app.post("/evaluate_resume", status_code=status.HTTP_200_OK)
+@app.post("/evaluate_resume", status_code=status.HTTP_200_OK, deprecated=True)
 async def evaluate_resume(payload: ResumeEvaluationRequest):
     """
     Evaluate resume by LLM 2
@@ -110,3 +110,13 @@ async def evaluate_resume(payload: ResumeEvaluationRequest):
         return response
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to start LLM evaluation stream: {e}")
+
+
+@app.get("/")
+async def docs():
+    return RedirectResponse("/docs")
+
+
+# For local debug purpose
+if __name__ == "__main__":
+    uvicorn.run(app)

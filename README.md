@@ -4,12 +4,11 @@
 
 Run the below cmds on terminal for local dev:
 ```commandline
- make all
- ./start.sh
+ make local
 ```
 Or run it from containers:
 ```commandline
- docker compose up -d
+ make prod
 ```
 
 This will spin up the local ollama model and backend service container along with web ui app.
@@ -26,11 +25,11 @@ And the UI will run on below url:
 ``
 
 
-### Useful Makefile commands
+### Useful Makefile commands to run separately
 ```commandline
- make all_backend
+ make backend
 ```
 ```commandline
- make all_ui
+ make ui
 ```
 For more commands refer the Makefile.

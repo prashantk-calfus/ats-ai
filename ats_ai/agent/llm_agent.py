@@ -81,7 +81,8 @@ async def extract_resume_info(raw_resume_text: str):
         2. **Use the EXACT JSON structure provided below.** Adhere strictly to all keys, data types, and nesting.
         3. **Handle Missing Information:**
         * For **single string fields** (e.g., "Name", "Mobile_No", "Github_Repo"), if information is missing, use the string value "NA".
-        * For **lists/arrays** (e.g., "Education", "Professional_Experience", "Projects", "Certifications", "Programming_Language", "Frameworks", "Technologies"), if no relevant entries are found, return an **empty array []**. Do not return an object with "NA" values inside an empty array.
+        * For **lists/arrays** (e.g., "Education", "Professional_Experience", "Projects", "Certifications", "Programming_Language", "Frameworks", "Technologies"),
+         if no relevant entries are found, return an **empty array []**. Do not return an object with "NA" values inside an empty array.
         4. **All JSON keys must be in double quotes.**
         5. **Be thorough and accurate** - don't invent information that isn't there.
         6. **Pay special attention to technical skills, programming languages, and frameworks.**
@@ -159,7 +160,8 @@ async def evaluate_resume_against_jd(jd_json: dict, resume_data: dict):
     Evaluate parsed information from resume from JD
     """
     prompt = f"""
-        You are a **highly experienced Senior HR Professional and Technical Recruiter** with 15+ years of experience in technical hiring. Your primary objective is to **accurately and reliably evaluate a candidate's resume against a given Job Description (JD)**. Provide a comprehensive, nuanced assessment that directly aids in critical hiring decisions.
+        You are a **highly experienced Senior HR Professional and Technical Recruiter** with 15+ years of experience in technical hiring. Your primary objective is to **accurately and reliably evaluate a candidate's resume against a given Job Description (JD)**.
+         Provide a comprehensive, nuanced assessment that directly aids in critical hiring decisions.
     
         **CRITICAL INSTRUCTIONS FOR EVALUATION:**
     

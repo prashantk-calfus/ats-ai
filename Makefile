@@ -1,13 +1,26 @@
-.PHONY: all make_env install_poetry
+.PHONY: local prod make_env install_poetry ui install backend
 
 PYTHON_VERSION := $(shell awk -F '"' '/^python =/ { print $$2 }' pyproject.toml)
 POETRY_HOME := $(shell echo $$HOME/.local/bin)
 VENV_DIR := .venv
 
-all: make_env
+
+prod:
+	docker compose up --build -d
+
+local: install
+	chmod +x start.sh
+	./start.sh
+
+backend: install
+	poetry run uvicorn ats_ai.app_server:app --host 0.0.0.0 --port 8000
+
+ui:
+	poetry run streamlit run ats_ai/streamlit_app.py --server.port 8501
+
+install: make_env
 	poetry install --no-root
 	poetry run pre-commit install
-	chmod +x start.sh
 
 make_env:
 	# Checks if venv is created or not
