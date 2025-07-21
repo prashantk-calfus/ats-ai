@@ -12,8 +12,6 @@ services:
     volumes:
       - .:/ats_ai
     restart: unless-stopped
-    environment:
-      - GEMINI_API_KEY=AIzaSyDtMrdlbdmu4AQmqnPH3rzrsk1USgdnrPo
 
   ui:
     image: ats_ai_base

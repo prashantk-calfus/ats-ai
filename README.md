@@ -1,5 +1,8 @@
 # AI HR APP
 
+### Prerequisite:
+Please get the GEMINI_API_KEY and put it in your .env file
+
 ### Setup Instructions
 
 Run the below cmds on terminal for local dev:

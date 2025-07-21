@@ -12,7 +12,7 @@ ENV PATH="/root/.local/bin:$PATH"
 WORKDIR /app
 
 # Copy only dependency files first
-COPY pyproject.toml poetry.lock ./
+COPY pyproject.toml poetry.lock .env ./
 
 # Install deps
 RUN poetry config virtualenvs.create false \
