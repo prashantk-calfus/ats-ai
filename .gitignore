@@ -3,11 +3,12 @@ __pycache__/
 .idea/
 .env
 None/
-.DS_Store/
+.DS_Store
 
 # Data Folder
 jd
-
+data/
+jd_json_temp/
 
 # Test files
 .coverage
