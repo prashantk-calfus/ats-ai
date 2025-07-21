@@ -1,0 +1,17 @@
+[theme]
+# A soft, warm accent color (e.g., a muted coral/orange)
+primaryColor = "#FF8A65" # Soft Coral/Orange
+
+# Very light, warm off-white background - much softer than pure white
+backgroundColor = "#FFFBF7" # Light Cream / Almost White
+
+# Slightly deeper, warm light background for secondary elements
+secondaryBackgroundColor = "#F7F2EB" # Light Beige
+
+# Dark, readable text
+textColor = "#3C3C3C" # Dark Gray
+
+font = "sans serif"
+
+#[global]
+#is==light_theme=true

@@ -1,21 +1,27 @@
-# Data
-chroma_resume_db
-data
-evaluation_results
+# Mac OS and IDE files
+__pycache__/
+.idea/
+.env
+None/
+.DS_Store/
+
+# Data Folder
 jd
-jd_json
-all_resume_evaluations.json
-llama_scores.json
-mistral_scores.json
 
-# Processing Code Files
-Rag_Eval.py
-evaluate_all.py
-llm_evaluation.py
-resume_matcher.py
+# Test files
+.coverage
+.coverage.*
+.cache
 
-#Env
+# Environments
 .venv
-.idea
-
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
 .DS_Store
+.pre-commit-config.yaml
+
+# Log Dir
+.logs/
