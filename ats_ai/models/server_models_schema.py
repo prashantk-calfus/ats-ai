@@ -1,5 +1,4 @@
 from typing import Any, Dict, Optional
-
 from pydantic import BaseModel
 
 
@@ -22,6 +21,28 @@ class ResumeEvaluationRequest(BaseModel):
             ]
         }
     }
+
+
+# Define structured schema for parsed resume info
+class ParsedResume(BaseModel):
+    Name: str
+    Contact_Details: dict
+    Github_Repo: str
+    LinkedIn: str
+    Education: list
+    Professional_Experience: list
+    Projects: list
+    Certifications: list
+    Programming_Language: list[str]
+    Frameworks: list[str]
+    Technologies: list[str]
+
+
+class ResumeEvaluation(BaseModel):
+    Evaluation_Summary: dict
+    Strengths_and_Weaknesses: dict
+    Skill_Analysis: dict
+    Key_Considerations: dict
 
 
 # SCHEMA FOR STORING CANDIDATE ACCEPTANCE DECISION

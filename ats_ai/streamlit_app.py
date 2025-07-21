@@ -1,24 +1,18 @@
-"""Testing out the new frontend changes."""
-
 import json
-import os
-import time
-import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
 import requests
 import streamlit as st
 
-# Assuming these are defined in your project or passed as environment variables
-# Ensure this URL is correct for your backend service
-BACKEND_URL = "http://localhost:8000"
+from frontend_calls import upload_resume_file_to_backend, parse_resume_from_backend, evaluate_resume_with_backend
 
+BACKEND_URL = "http://localhost:8000"
 JD_OPTIONS = {
     "Select a pre-existing JD": "Select a pre-existing JD",
-    "Senior Python Development Engineer": "SrPDE.json",
-    "Oracle ERP": "OracleERP.json",
-    "Data Architect": "DataArchJD.json",
-    "Senior Full Stack Engineer": "SeniorFullStackEngineer_Python.json",
+    "Senior Python Development Engineer": "jd_json/SrPDE.json",
+    "Oracle ERP": "jd_json/OracleERP.json",
+    "Data Architect": "jd_json/DataArchJD.json",
+    "Senior Full Stack Engineer": "jd_json/SeniorFullStackEngineer_Python.json",
 }
 
 
@@ -113,7 +107,7 @@ def display_final_evaluation_results(evaluation_results: Dict[str, Any]):
     exp_score = eval_summary.get("Experience_Score", "N/A")
     skills_score = eval_summary.get("Skills_Score", "N/A")
     edu_score = eval_summary.get("Education_Score", "N/A")
-    projects_score = eval_summary.get("Projects_Score", "N/A")  # Added projects score
+    projects_score = eval_summary.get("Projects_Score", "N/A")
     overall_score = eval_summary.get("Overall_Weighted_Score", "N/A")
 
     col_score1, col_score2, col_score3 = st.columns(3)
@@ -219,97 +213,6 @@ def display_final_evaluation_results(evaluation_results: Dict[str, Any]):
         st.markdown(f"- {overall_recommendation}")
 
 
-# --- Backend Communication Functions ---
-
-
-def upload_resume_file_to_backend(file, status_placeholder) -> Optional[str]:
-    """
-    Uploads the resume PDF to the backend and returns the filename if successful.
-    The backend saves the file and does NOT return parsed data here.
-    """
-    try:
-        file.seek(0)  # Ensure file pointer is at the beginning
-        files = {"resume_file": (file.name, file.getvalue(), file.type)}
-        status_placeholder.info(f"Uploading `{file.name}` to backend...")
-        upload_response = requests.post(f"{BACKEND_URL}/upload_resume_file", files=files)
-
-        if upload_response.status_code == 200:
-            response_data = upload_response.json()
-            if response_data.get("message") == "Resume uploaded successfully":
-                status_placeholder.success(f"Resume uploaded: `{file.name}`")
-                return file.name
-            else:
-                status_placeholder.error(f"Upload failed: {response_data.get('message', 'Unknown error')}")
-                return None
-        else:
-            status_placeholder.error(f"Backend upload error: Status {upload_response.status_code} - {upload_response.text}")
-            return None
-    except requests.exceptions.RequestException as req_err:
-        status_placeholder.error(f"Network or backend connection error during upload: {req_err}")
-        return None
-    except Exception as e:
-        status_placeholder.error(f"An unexpected error occurred during upload: {str(e)}")
-        return None
-
-
-def parse_resume_from_backend(resume_filename: str, status_placeholder) -> Optional[Dict[str, Any]]:
-    """
-    Sends a request to the backend's /resume_parser endpoint to get the parsed resume JSON.
-    """
-    try:
-        status_placeholder.info(f"Requesting parsing for `{resume_filename}` from backend...")
-        # Note: The backend's /resume_parser expects the filename as a query parameter
-        parse_response = requests.get(f"{BACKEND_URL}/resume_parser", params={"resume_path": resume_filename})
-
-        if parse_response.status_code == 200:
-            parsed_data = parse_response.json()
-            status_placeholder.success(f"Resume parsed successfully for `{resume_filename}`.")
-            return parsed_data
-        else:
-            status_placeholder.error(f"Backend parsing error: Status {parse_response.status_code} - {parse_response.text}")
-            return None
-    except requests.exceptions.RequestException as req_err:
-        status_placeholder.error(f"Network or backend connection error during parsing: {req_err}")
-        return None
-    except Exception as e:
-        status_placeholder.error(f"An unexpected error occurred during parsing: {str(e)}")
-        return None
-
-
-def evaluate_resume_with_backend(
-    parsed_data: Dict[str, Any], jd_path: str, evaluation_status_placeholder
-) -> Optional[Dict[str, Any]]:
-    """Sends evaluation request to backend"""
-    try:
-        if not parsed_data:
-            evaluation_status_placeholder.warning("No parsed resume data available for evaluation.")
-            return None
-
-        payload = {
-            "resume_json": parsed_data,
-            "jd_path": jd_path,  # This should be the path to the JD file on the backend's accessible file system
-        }
-
-        evaluation_status_placeholder.info(f"Sending evaluation request with JD: `{jd_path}`....")
-
-        eval_response = requests.post(f"{BACKEND_URL}/evaluate_resume", json=payload)
-
-        if eval_response.status_code == 200:
-            return eval_response.json()
-        else:
-            evaluation_status_placeholder.error(
-                f"Backend responded with an error during evaluation: Status {eval_response.status_code} - {eval_response.text}"
-            )
-            return None
-
-    except requests.exceptions.RequestException as req_err:
-        evaluation_status_placeholder.error(f"Network or backend error during evaluation: {req_err}")
-        return None
-    except Exception as e:
-        evaluation_status_placeholder.error(f"An unexpected error occurred during evaluation: {str(e)}")
-        return None
-
-
 # --- Streamlit Frontend (main app structure) ---
 st.set_page_config(layout="wide", page_title="Resume Analyzer")
 
@@ -317,7 +220,7 @@ st.title("Resume Analyzer and Evaluator")
 
 # Initialize session state variables
 if "uploaded_resume_filename" not in st.session_state:
-    st.session_state.uploaded_resume_filename = None  # To store the filename after upload
+    st.session_state.uploaded_resume_filename = None
 if "parsed_resume" not in st.session_state:
     st.session_state.parsed_resume = None
 if "personal_details" not in st.session_state:
@@ -340,7 +243,7 @@ uploaded_file = st.file_uploader("Choose a resume file (PDF)", type=["pdf"])
 parsing_status_messages = st.empty()
 
 if uploaded_file is not None:
-    if st.button("Process Resume", key="process_resume_btn"):  # Changed button text
+    if st.button("Process Resume", key="process_resume_btn"):
         # Clear states of previous sessions when a new resume is processed
         st.session_state.uploaded_resume_filename = None
         st.session_state.parsed_resume = None
@@ -370,7 +273,7 @@ if uploaded_file is not None:
 
 # --- Collapsible Parsed Resume Section ---
 if st.session_state.parsed_resume:
-    with st.expander("View Parsed Resume Information (Click to Expand)"):  # Changed expander title
+    with st.expander("View Parsed Resume Information (Click to Expand)"):
         display_parsed_resume_in_markdown(st.session_state.parsed_resume)
     st.markdown("---")
 
@@ -380,50 +283,41 @@ if st.session_state.show_jd_sections:
     # --- Section 2: Provide Job Description ---
     st.header("2. Provide Job Description")
 
+    st.info("Please paste a JD or select one from the dropdown to proceed.")
+
     custom_jd_text = st.text_area(
-        "Paste a Job Description here:",
+        "Paste a Job Description here ( Press Cmd+Enter to submit )",
         height=80,
         help="Paste the full job description. If text is entered here, it will be used instead of the dropdown selection.",
     )
 
     # Create a dropdown for JD options
-    selected_jd_display = st.selectbox(
-        "Or Select a Job Description:", options=list(JD_OPTIONS.keys()), index=0  # Default to the first option
-    )
+    selected_jd_display = st.selectbox("Or Select a Job Description:", options=list(JD_OPTIONS.keys()), index=0)
 
     # Determine the JD path to send to the backend
-    jd_path_to_use = None
+    jd_content = None
     if custom_jd_text and len(custom_jd_text.strip()) > 50:
-        # Save custom JD to a temporary file on the frontend's machine.
-        # This file will then be referenced by its absolute path.
-        rand_filename = str(uuid.uuid4())[:8] + ".json"
-        temp_jd_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "jd_json_temp"))
-        os.makedirs(temp_jd_dir, exist_ok=True)
-        jd_file_path = os.path.join(temp_jd_dir, rand_filename)
 
-        temp_jd_content = {"job_description": custom_jd_text}
-        with open(jd_file_path, "w") as f:
-            json.dump(temp_jd_content, f, indent=4)
-
-        st.session_state.temp_jd_path = jd_file_path  # Store full path for potential cleanup
-        jd_path_to_use = jd_file_path  # Pass the absolute path to the backend
+        jd_content = {"job_description": custom_jd_text}
         st.info(f"Using custom JD from text.")
+
     elif selected_jd_display != "Select a pre-existing JD":
         # For pre-existing JDs, pass the filename. Backend will resolve it from its JD_UPLOAD_FOLDER.
         jd_path_to_use = JD_OPTIONS[selected_jd_display]
+        jd_content = json.load(open(jd_path_to_use))
         st.info(f"Selected pre-existing JD: `{jd_path_to_use}`")
-    else:
-        st.info("Please paste a JD or select one from the dropdown to proceed.")
 
-    # --- Section 3: Evaluate Resume against JD ---
-    st.header("3. Evaluate Resume against JD")
 
     # Placeholder for messages during evaluation
     evaluation_status_messages = st.empty()
 
-    if st.session_state.parsed_resume is not None and jd_path_to_use:
+    if st.session_state.parsed_resume is not None and jd_content:
         if st.button("Evaluate Resume", key="evaluate_resume_btn"):
             # Clear previous decision when re-evaluating
+
+            # --- Section 3: Evaluate Resume against JD ---
+            st.header("3. Evaluate Resume against JD")
+
             st.session_state.decision_made = None
 
             with st.spinner("Evaluating..."):
@@ -434,10 +328,11 @@ if st.session_state.show_jd_sections:
                 }
 
                 st.session_state.evaluation_results = evaluate_resume_with_backend(
-                    st.session_state.parsed_resume,  # Send the full parsed resume to backend
-                    jd_path_to_use,  # Send the determined JD path
+                    st.session_state.parsed_resume,
+                    jd_content,
                     evaluation_status_messages,
                 )
+
                 if st.session_state.evaluation_results:
                     evaluation_status_messages.success("Resume evaluation complete!")
                 else:
@@ -466,7 +361,7 @@ if st.session_state.evaluation_results:
             st.warning(f" **{candidate_name}** has been marked as **Rejected**!")
     else:
         # Shown when no decision made yet
-        col1, col2, col3 = st.columns([1, 1, 2])  # Added a third column for the report button
+        col1, col2, col3 = st.columns([1, 1, 2])
 
         with col1:
             if st.button("✅ Accept", key="accept_btn"):
@@ -497,7 +392,7 @@ if st.session_state.evaluation_results:
                 st.session_state.report_personal_details = {
                     key: st.session_state.parsed_resume.get(key) for key in personal_details_keys
                 }
-                # Navigate to the report page - ensure 'pages/report_page.py' exists relative to your app's root
+                # Navigate to the report page - ensure 'pages/report_page.py'
                 st.switch_page("pages/report_page.py")
 
 else:
