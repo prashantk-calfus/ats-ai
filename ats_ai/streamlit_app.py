@@ -3,8 +3,11 @@ from typing import Any, Dict
 
 import requests
 import streamlit as st
-
-from frontend_calls import upload_resume_file_to_backend, parse_resume_from_backend, evaluate_resume_with_backend
+from frontend_calls import (
+    evaluate_resume_with_backend,
+    parse_resume_from_backend,
+    upload_resume_file_to_backend,
+)
 
 BACKEND_URL = "http://localhost:8000"
 JD_OPTIONS = {
@@ -299,14 +302,13 @@ if st.session_state.show_jd_sections:
     if custom_jd_text and len(custom_jd_text.strip()) > 50:
 
         jd_content = {"job_description": custom_jd_text}
-        st.info(f"Using custom JD from text.")
+        st.info("Using custom JD from text.")
 
     elif selected_jd_display != "Select a pre-existing JD":
         # For pre-existing JDs, pass the filename. Backend will resolve it from its JD_UPLOAD_FOLDER.
         jd_path_to_use = JD_OPTIONS[selected_jd_display]
         jd_content = json.load(open(jd_path_to_use))
         st.info(f"Selected pre-existing JD: `{jd_path_to_use}`")
-
 
     # Placeholder for messages during evaluation
     evaluation_status_messages = st.empty()
@@ -323,9 +325,7 @@ if st.session_state.show_jd_sections:
             with st.spinner("Evaluating..."):
                 # Store personal details separately for the report page.
                 personal_details_keys = ["Name", "Contact_Details", "Github_Repo", "LinkedIn"]
-                st.session_state.personal_details = {
-                    key: st.session_state.parsed_resume.get(key) for key in personal_details_keys
-                }
+                st.session_state.personal_details = {key: st.session_state.parsed_resume.get(key) for key in personal_details_keys}
 
                 st.session_state.evaluation_results = evaluate_resume_with_backend(
                     st.session_state.parsed_resume,
@@ -349,9 +349,7 @@ if st.session_state.evaluation_results:
     display_final_evaluation_results(st.session_state.evaluation_results)
 
     # Accept/Reject buttons
-    candidate_name = (
-        st.session_state.personal_details.get("Name") if st.session_state.personal_details else None
-    ) or st.session_state.parsed_resume.get("Name", "Unknown")
+    candidate_name = (st.session_state.personal_details.get("Name") if st.session_state.personal_details else None) or st.session_state.parsed_resume.get("Name", "Unknown")
 
     # Display decision status if already made
     if st.session_state.decision_made:
@@ -389,9 +387,7 @@ if st.session_state.evaluation_results:
                 st.session_state.report_parsed_resume = st.session_state.parsed_resume
                 # Ensure personal_details is set before navigating
                 personal_details_keys = ["Name", "Contact_Details", "Github_Repo", "LinkedIn"]
-                st.session_state.report_personal_details = {
-                    key: st.session_state.parsed_resume.get(key) for key in personal_details_keys
-                }
+                st.session_state.report_personal_details = {key: st.session_state.parsed_resume.get(key) for key in personal_details_keys}
                 # Navigate to the report page - ensure 'pages/report_page.py'
                 st.switch_page("pages/report_page.py")
 

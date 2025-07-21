@@ -1,11 +1,13 @@
+from typing import Any, Dict, Optional
+
 import requests
-from typing import Optional, Dict, Any
 
 BACKEND_URL = "http://localhost:8000"
 
 """
     Functions used by frontend streamlit to call server.
 """
+
 
 def upload_resume_file_to_backend(file, status_placeholder) -> Optional[str]:
     """
@@ -73,15 +75,13 @@ def evaluate_resume_with_backend(parsed_data: Dict[str, Any], jd_json: Dict[str,
         }
         # st.json(payload)
 
-        evaluation_status_placeholder.info(f"Sending evaluation request with JD....")
+        evaluation_status_placeholder.info("Sending evaluation request with JD....")
         eval_response = requests.post(f"{BACKEND_URL}/evaluate_resume", json=payload)
 
         if eval_response.status_code == 200:
             return eval_response.json()
         else:
-            evaluation_status_placeholder.error(
-                f"Backend responded with an error during evaluation: Status {eval_response.status_code} - {eval_response.text}"
-            )
+            evaluation_status_placeholder.error(f"Backend responded with an error during evaluation: Status {eval_response.status_code} - {eval_response.text}")
             return None
 
     except requests.exceptions.RequestException as req_err:
