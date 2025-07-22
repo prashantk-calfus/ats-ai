@@ -1,12 +1,9 @@
 
 services:
   backend:
-    image: ramdorak571/ats_ai_base:0.2.3
-#    build:
-#      context: .
-#      dockerfile: Dockerfile
-    container_name: ats_fastapi
+    image: ramdorak571/ats_ai_base:0.2.2
     platform: linux/amd64
+    container_name: ats_fastapi
     command: poetry run uvicorn ats_ai.app_server:app --host 0.0.0.0 --port 8000
     ports:
       - "8000:8000"
@@ -15,7 +12,7 @@ services:
     restart: unless-stopped
 
   ui:
-    image: ramdorak571/ats_ai_base:0.2.3
+    image: ramdorak571/ats_ai_base:0.2.2
     platform: linux/amd64
     container_name: ats_streamlit
     command: poetry run streamlit run ats_ai/streamlit_app.py --server.port 8501
