@@ -1,13 +1,13 @@
 .PHONY: local prod make_env install_poetry ui install backend
 
-VERSION:=0.2.2
+VERSION:=0.2.3
 PYTHON_VERSION := $(shell awk -F '"' '/^python =/ { print $$2 }' pyproject.toml)
 POETRY_HOME := $(shell echo $$HOME/.local/bin)
 VENV_DIR := .venv
 
 
 prod:
-	docker compose up -d
+	docker compose up
 
 local: install
 	chmod +x start.sh

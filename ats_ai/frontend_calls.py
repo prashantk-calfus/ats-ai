@@ -1,8 +1,9 @@
+import os
 from typing import Any, Dict, Optional
 
 import requests
 
-BACKEND_URL = "http://localhost:8000"
+BACKEND_URL = os.getenv("BACKEND_URL", default="http://backend:8000")
 
 """
     Functions used by frontend streamlit to call server.

@@ -1,4 +1,3 @@
-import time
 from typing import Any, Dict
 
 import streamlit as st
@@ -218,12 +217,12 @@ if evaluation_results and parsed_resume:
     st.header(f"Report for: {candidate_name}")
     st.markdown("---")
 
-    ## Evaluation Summary
+    # Evaluation Summary
     display_final_evaluation_results(evaluation_results)
 
     st.markdown("---")
 
-    ## Parsed Resume Details
+    # Parsed Resume Details
     st.header("Parsed Resume Details")
     with st.expander("View Full Parsed Resume (Click to Expand)"):
         # Corrected: Directly call display_parsed_resume_in_markdown
@@ -233,4 +232,4 @@ else:
 
 st.markdown("---")
 if st.button("⬅️ Back to Main Page"):
-    st.switch_page("test_frontend.py")
+    st.switch_page("streamlit_app.py")

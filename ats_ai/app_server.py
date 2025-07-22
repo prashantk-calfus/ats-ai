@@ -1,24 +1,24 @@
-import json
 import os
 import shutil
 from typing import Any, Dict
 
+import uvicorn
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from langchain_community.document_loaders import PyMuPDFLoader
 from pydantic import BaseModel
 from starlette import status
-import uvicorn
 from starlette.responses import RedirectResponse
 
 from ats_ai.agent.llm_agent import evaluate_resume_against_jd, extract_resume_info
 
 RESUME_UPLOAD_FOLDER = "data/"
 JD_UPLOAD_FOLDER = "jd_json/"
+RESUME_FILE_UPLOAD = File(...)
 
 
 class ResumeEvaluationRequest(BaseModel):
     resume_json: Dict[str, Any]
-    jd_path: str
+    jd_json: Dict[str, Any]
 
     model_config = {
         "json_schema_extra": {
@@ -30,7 +30,7 @@ class ResumeEvaluationRequest(BaseModel):
                         "experience": [{"title": "Software Engineer", "company": "Tech Corp", "years": "2020-Present"}],
                         "skills": ["Python", "FastAPI", "Docker"],
                     },
-                    "jd_path": "software_engineer_v1.json",
+                    "jd_json": "{Job Description}",
                 }
             ]
         }
@@ -53,7 +53,7 @@ def load_pdf_text(file_path: str) -> str:
 
 # UPDATED FOR STREAMING RESPONSE CAPABILITY
 @app.post("/upload_resume_file", status_code=status.HTTP_200_OK)
-async def upload_resume_file(resume_file: UploadFile = File(...)):
+async def upload_resume_file(resume_file: UploadFile = RESUME_FILE_UPLOAD):
     if not resume_file.filename:
         raise HTTPException(status_code=400, detail="No file found")
     if not resume_file.filename.endswith(".pdf"):
@@ -67,12 +67,6 @@ async def upload_resume_file(resume_file: UploadFile = File(...)):
 
     with open(file_path, "wb") as f:
         shutil.copyfileobj(resume_file.file, f)
-
-    try:
-        new_chunks = load_pdf_text(file_path)  # Check for min text requirement
-    except ValueError as e:
-        os.remove(file_path)  # FILE REMOVED
-        return {"message": str(e)}
 
     return {"message": "Resume uploaded successfully"}
 
@@ -100,10 +94,7 @@ async def evaluate_resume(payload: ResumeEvaluationRequest):
     Expect response in JSON.
     """
     resume_json = payload.resume_json
-    jd_path = payload.jd_path
-
-    jd_filepath = os.path.join(JD_UPLOAD_FOLDER, jd_path)
-    jd_json = json.load(open(jd_filepath))
+    jd_json = payload.jd_json
 
     # Calls Evaluation LLM in llm_chain_agent.py
     try:
@@ -113,9 +104,11 @@ async def evaluate_resume(payload: ResumeEvaluationRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to start LLM evaluation stream: {e}")
 
+
 @app.get("/")
 async def docs():
     return RedirectResponse("/docs")
+
 
 # For local debug purpose
 if __name__ == "__main__":

@@ -1,4 +1,5 @@
 import json
+import os
 from typing import Any, Dict
 
 import requests
@@ -9,7 +10,7 @@ from frontend_calls import (
     upload_resume_file_to_backend,
 )
 
-BACKEND_URL = "http://localhost:8000"
+BACKEND_URL = os.getenv("BACKEND_URL", default="http://backend:8000")
 JD_OPTIONS = {
     "Select a pre-existing JD": "Select a pre-existing JD",
     "Senior Python Development Engineer": "jd_json/SrPDE.json",
@@ -302,6 +303,7 @@ if st.session_state.show_jd_sections:
     if custom_jd_text and len(custom_jd_text.strip()) > 50:
 
         jd_content = {"job_description": custom_jd_text}
+
         st.info("Using custom JD from text.")
 
     elif selected_jd_display != "Select a pre-existing JD":
