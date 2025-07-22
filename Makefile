@@ -7,7 +7,7 @@ VENV_DIR := .venv
 
 
 prod:
-	docker compose up --build -d
+	docker compose up -d
 
 local: install
 	chmod +x start.sh
@@ -24,10 +24,10 @@ install: make_env
 	poetry run pre-commit install
 
 build:
-	docker build --platform linux/amd64 -t ghcr.io/your-github-username/ats_ai_base:$(VERSION) .
+	docker build --platform linux/amd64 -t ramdorak571/ats_ai_base:$(VERSION) .
 
 push:
-	docker push ghcr.io/your-github-username/ats_ai_base:$(VERSION)
+	docker push ramdorak571/ats_ai_base:$(VERSION)
 
 make_env:
 	# Checks if venv is created or not
