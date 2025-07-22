@@ -1,26 +1,26 @@
-version: "3.9"
 
 services:
   backend:
-    build:
-      context: ./Backend
-    container_name: backend
+    image: ramdorak571/ats_ai_base:0.2.3
+#    build:
+#      context: .
+#      dockerfile: Dockerfile
+    container_name: ats_fastapi
+    platform: linux/amd64
+    command: poetry run uvicorn ats_ai.app_server:app --host 0.0.0.0 --port 8000
     ports:
       - "8000:8000"
     volumes:
-      - ./data:/app/data
-      - ./jd:/app/jd
-      - ./jd_json:/app/jd_json
-    restart: always
+      - .:/ats_ai
+    restart: unless-stopped
 
-  frontend:
-    build:
-      context: ./Frontend
-    container_name: frontend
+  ui:
+    image: ramdorak571/ats_ai_base:0.2.3
+    platform: linux/amd64
+    container_name: ats_streamlit
+    command: poetry run streamlit run ats_ai/streamlit_app.py --server.port 8501
     ports:
       - "8501:8501"
-    environment:
-      - BACKEND_URL=http://backend:8000
-    depends_on:
-      - backend
-    restart: always
+    volumes:
+      - .:/ats_ai
+    restart: unless-stopped
