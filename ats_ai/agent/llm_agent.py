@@ -12,7 +12,7 @@ from pydantic import BaseModel
     to create a robust and accurate assessment of a candidate.
     1. extract_resume_info : Parsing Agent
     2. evaluate_resume_against_jd : Evaluation Agent
-    3. correct_evaluation_output : Validation Agent
+
 """
 
 load_dotenv()
@@ -160,8 +160,9 @@ async def evaluate_resume_against_jd(jd_json: dict, resume_data: dict):
     Evaluate parsed information from resume from JD
     """
     prompt = f"""
-        You are a **highly experienced Senior HR Professional and Technical Recruiter** with 15+ years of experience in technical hiring. Your primary objective is to **accurately and reliably evaluate a candidate's resume against a given Job Description (JD)**.
-         Provide a comprehensive, nuanced assessment that directly aids in critical hiring decisions.
+        You are a **highly experienced Senior HR Professional and Technical Recruiter** with 15+ years of experience in technical hiring. 
+        Your primary objective is to **accurately and reliably evaluate a candidate's resume against a given Job Description (JD)**.
+        Provide a comprehensive, nuanced assessment that directly aids in critical hiring decisions.
     
         **CRITICAL INSTRUCTIONS FOR EVALUATION:**
     
