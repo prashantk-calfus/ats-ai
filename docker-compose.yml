@@ -1,5 +1,6 @@
 
 services:
+
   backend:
     image: ramdorak571/ats_ai_base:0.2.2
     platform: linux/amd64
