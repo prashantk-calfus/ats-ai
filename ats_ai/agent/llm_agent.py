@@ -16,8 +16,9 @@ from ats_ai.agent.prompts import (
 """
     Using LLM chaining workflow to parse, evaluate, and validate resume and given job description
     to create a robust and accurate assessment of a candidate.
-    1. extract_resume_info : Parsing Agent
-    2. evaluate_resume_against_jd : Evaluation Agent
+    1. extract_resume_info : extract_resume_info()
+    2. evaluate_resume_against_jd : evaluate_resume_against_jd()
+    3. Combined Evaluation Agent: combined_parse_evaluate()
 """
 
 load_dotenv()

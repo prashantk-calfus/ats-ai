@@ -17,6 +17,7 @@ JD_OPTIONS = {
 st.title("Combined View for faster results")
 st.session_state.parsed_resume = None
 st.session_state.evaluation_results = None
+st.session_state.parsed_data = None
 
 uploaded_resume = st.file_uploader("Upload resume file (PDF)", type=["pdf"])
 
@@ -59,137 +60,137 @@ if uploaded_resume is not None and jd_path:
                 else:
                     st.error(f"Evaluation failed: {response.status_code}")
 
-parsed_resume_data = st.session_state.parsed_data.get("Parsed_Resume")
-eval_results = st.session_state.parsed_data.get("Evaluation")
-candidate_name = parsed_resume_data.get("Name")
-st.header(f"Evaluation Report for: {candidate_name}")
+if st.session_state.parsed_data:
+    parsed_resume_data = st.session_state.parsed_data.get("Parsed_Resume")
+    eval_results = st.session_state.parsed_data.get("Evaluation")
+    candidate_name = parsed_resume_data.get("Name")
+    st.header(f"Evaluation Report for: {candidate_name}")
 
-"""EVALUATION REPORT IN MARKDOWN"""
+    """EVALUATION REPORT IN MARKDOWN"""
 
-exp_score = eval_results.get("Experience_Score")
-skill_score = eval_results.get("Skills_Score")
-edu_score = eval_results.get("Education_Score")
-projects_score = eval_results.get("Projects_Score")
-overall_score = eval_results.get("Overall_Weighted_Score")
-match_jd = eval_results.get("Match_Percentage")
-qual_status = eval_results.get("Qualification Status")
+    exp_score = eval_results.get("Experience_Score")
+    skill_score = eval_results.get("Skills_Score")
+    edu_score = eval_results.get("Education_Score")
+    projects_score = eval_results.get("Projects_Score")
+    overall_score = eval_results.get("Overall_Weighted_Score")
+    match_jd = eval_results.get("Match_Percentage")
+    qual_status = eval_results.get("Qualification Status")
 
-col_score1, col_score2, col_score3 = st.columns(3)
-with col_score1:
-    st.metric(label=" Overall Score (0-10)", value=overall_score)
-with col_score2:
-    st.metric(label=" Match with JD", value=match_jd)
-with col_score3:
-    if qual_status == "Qualified":
-        st.success(f" Status: {qual_status}")
-    else:
-        st.error(f" Status: {qual_status}")
-
-# === Individual Scores ===
-st.markdown("---")
-st.markdown("#### Detailed Scores")
-
-col_ind_score1, col_ind_score2, col_ind_score3, col_ind_score4 = st.columns(4)  # Added a column for projects score
-with col_ind_score1:
-    st.metric(label="Experience Score (0-10)", value=exp_score)
-with col_ind_score2:
-    st.metric(label="Skills Score (0-10)", value=skill_score)
-with col_ind_score3:
-    st.metric(label="Education Score (0-10)", value=edu_score)
-with col_ind_score4:
-    st.metric(label="Projects Score (0-10)", value=projects_score)
-
-
-st.markdown("---")
-st.markdown("#### Strengths and Areas for Improvement")
-
-pros = eval_results.get("Pros")
-cons = eval_results.get("Cons")
-
-col_pros, col_cons = st.columns(2)
-
-with col_pros:
-    st.success("##### Strengths")
-    if pros:
-        for p in pros:
-            st.write(f"- {p}")
-    else:
-        st.info("No specific strengths identified.")
-
-with col_cons:
-    st.warning("##### Weaknesses")
-    if cons:
-        for c in cons:
-            st.write(f"- {c}")
-    else:
-        st.info("No specific weaknesses identified.")
-
-missing_req = eval_results.get("Missing_Requirements")
-if missing_req:
-    st.markdown("**Missing Skills (from JD):**")
-    st.warning(",\n ".join(missing_req))
-
-summary_eval = eval_results.get("Summary")
-if summary_eval:
-    st.markdown("**Summary**")
-    st.markdown(f"- {summary_eval}")
-
-if parsed_resume_data:
-    with st.expander("Parsed Resume Information"):
-
-        st.write(f"**Name:** {candidate_name}")
-
-        contact_details = parsed_resume_data.get("Contact_Details", {})
-        if contact_details:
-            st.write(f"**Mobile No:** {contact_details.get('Mobile_No', 'N/A')}")
-            st.write(f"**Email:** {contact_details.get('Email', 'N/A')}")
+    col_score1, col_score2, col_score3 = st.columns(3)
+    with col_score1:
+        st.metric(label=" Overall Score (0-10)", value=overall_score)
+    with col_score2:
+        st.metric(label=" Match with JD", value=match_jd)
+    with col_score3:
+        if qual_status == "Qualified":
+            st.success(f" Status: {qual_status}")
         else:
-            st.write("**Contact Details:** Not provided")
+            st.error(f" Status: {qual_status}")
 
-        st.write(f"**GitHub:** {parsed_resume_data.get('Github_Repo', 'N/A')}")
-        st.write(f"**LinkedIn:** {parsed_resume_data.get('LinkedIn', 'N/A')}")
+    # === Individual Scores ===
+    st.markdown("---")
+    st.markdown("#### Detailed Scores")
 
-        st.markdown("---")
-        st.markdown("#### Education")
-        education_entries = parsed_resume_data.get("Education", [])
-        if education_entries:
-            for edu in education_entries:
-                st.markdown(f"**{edu.get('Degree', 'N/A')}** at {edu.get('Institution', 'N/A')}")
-                st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;*Score:* {edu.get('Score', 'N/A')}, *Duration:* {edu.get('Duration', 'N/A')}")
+    col_ind_score1, col_ind_score2, col_ind_score3, col_ind_score4 = st.columns(4)  # Added a column for projects score
+    with col_ind_score1:
+        st.metric(label="Experience Score (0-10)", value=exp_score)
+    with col_ind_score2:
+        st.metric(label="Skills Score (0-10)", value=skill_score)
+    with col_ind_score3:
+        st.metric(label="Education Score (0-10)", value=edu_score)
+    with col_ind_score4:
+        st.metric(label="Projects Score (0-10)", value=projects_score)
+
+    st.markdown("---")
+    st.markdown("#### Strengths and Areas for Improvement")
+
+    pros = eval_results.get("Pros")
+    cons = eval_results.get("Cons")
+
+    col_pros, col_cons = st.columns(2)
+
+    with col_pros:
+        st.success("##### Strengths")
+        if pros:
+            for p in pros:
+                st.write(f"- {p}")
         else:
-            st.info("No education details provided.")
+            st.info("No specific strengths identified.")
 
-        st.markdown("---")
-        st.markdown("#### Professional Experience")
-        experience_entries = parsed_resume_data.get("Professional_Experience", [])
-        if experience_entries:
-            for exp in experience_entries:
-                st.markdown(f"**{exp.get('Role', 'N/A')}** at **{exp.get('Company', 'N/A')}**")
-                st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;*Duration:* {exp.get('Duration', 'N/A')}")
-                if exp.get("Description", "N/A") != "N/A":
-                    st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;*Description:* {exp.get('Description', 'N/A')}")
+    with col_cons:
+        st.warning("##### Weaknesses")
+        if cons:
+            for c in cons:
+                st.write(f"- {c}")
         else:
-            st.info("No professional experience details provided.")
+            st.info("No specific weaknesses identified.")
 
-        st.markdown("---")
-        st.markdown("#### Projects")
-        project_entries = parsed_resume_data.get("Projects", [])
-        if project_entries and project_entries[0].get("Project_Name", "NA").upper() != "NA":
-            for proj in project_entries:
-                st.markdown(f"**Project Name:** {proj.get('Project_Name', 'N/A')}")
-                st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;*Description:* {proj.get('Project_Description', 'N/A')}")
-        else:
-            st.info("No project details provided.")
+    missing_req = eval_results.get("Missing_Requirements")
+    if missing_req:
+        st.markdown("**Missing Skills (from JD):**")
+        st.warning(",\n ".join(missing_req))
 
-        st.markdown("---")
-        st.markdown("#### Certifications")
-        certification_entries = parsed_resume_data.get("Certifications", [])
-        if certification_entries:
-            for cer in certification_entries:
-                st.markdown(f"{cer}")
+    summary_eval = eval_results.get("Summary")
+    if summary_eval:
+        st.markdown("**Summary**")
+        st.markdown(f"- {summary_eval}")
 
-        st.markdown("#### Technical Skills")
-        skills = parsed_resume_data.get("Skills", [])
-        if skills:
-            for skill in skills:
-                st.markdown(f"⦿ {skill}")
+    if parsed_resume_data:
+        with st.expander("Parsed Resume Information"):
+
+            st.write(f"**Name:** {candidate_name}")
+
+            contact_details = parsed_resume_data.get("Contact_Details", {})
+            if contact_details:
+                st.write(f"**Mobile No:** {contact_details.get('Mobile_No', 'N/A')}")
+                st.write(f"**Email:** {contact_details.get('Email', 'N/A')}")
+            else:
+                st.write("**Contact Details:** Not provided")
+
+            st.write(f"**GitHub:** {parsed_resume_data.get('Github_Repo', 'N/A')}")
+            st.write(f"**LinkedIn:** {parsed_resume_data.get('LinkedIn', 'N/A')}")
+
+            st.markdown("---")
+            st.markdown("#### Education")
+            education_entries = parsed_resume_data.get("Education", [])
+            if education_entries:
+                for edu in education_entries:
+                    st.markdown(f"**{edu.get('Degree', 'N/A')}** at {edu.get('Institution', 'N/A')}")
+                    st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;*Score:* {edu.get('Score', 'N/A')}, *Duration:* {edu.get('Duration', 'N/A')}")
+            else:
+                st.info("No education details provided.")
+
+            st.markdown("---")
+            st.markdown("#### Professional Experience")
+            experience_entries = parsed_resume_data.get("Professional_Experience", [])
+            if experience_entries:
+                for exp in experience_entries:
+                    st.markdown(f"**{exp.get('Role', 'N/A')}** at **{exp.get('Company', 'N/A')}**")
+                    st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;*Duration:* {exp.get('Duration', 'N/A')}")
+                    if exp.get("Description", "N/A") != "N/A":
+                        st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;*Description:* {exp.get('Description', 'N/A')}")
+            else:
+                st.info("No professional experience details provided.")
+
+            st.markdown("---")
+            st.markdown("#### Projects")
+            project_entries = parsed_resume_data.get("Projects", [])
+            if project_entries and project_entries[0].get("Project_Name", "NA").upper() != "NA":
+                for proj in project_entries:
+                    st.markdown(f"**Project Name:** {proj.get('Project_Name', 'N/A')}")
+                    st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;*Description:* {proj.get('Project_Description', 'N/A')}")
+            else:
+                st.info("No project details provided.")
+
+            st.markdown("---")
+            st.markdown("#### Certifications")
+            certification_entries = parsed_resume_data.get("Certifications", [])
+            if certification_entries:
+                for cer in certification_entries:
+                    st.markdown(f"{cer}")
+
+            st.markdown("#### Technical Skills")
+            skills = parsed_resume_data.get("Skills", [])
+            if skills:
+                for skill in skills:
+                    st.markdown(f"⦿ {skill}")
