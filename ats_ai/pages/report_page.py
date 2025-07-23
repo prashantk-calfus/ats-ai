@@ -56,10 +56,9 @@ def display_parsed_resume_in_markdown(parsed_resume_data: Dict[str, Any]):
     st.markdown("---")
     st.markdown("#### Certifications")
     certification_entries = parsed_resume_data.get("Certifications", [])
-    if certification_entries and certification_entries[0].get("Certification_Authority", "NA").upper() != "NA":
+    if certification_entries:
         for cert in certification_entries:
-            st.markdown(f"**Certification:** {cert.get('Certification_Details', 'N/A')}")
-            st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;*Authority:* {cert.get('Certification_Authority', 'N/A')}")
+            st.markdown(f"- {cert}")
     else:
         st.info("No certification details provided.")
 
@@ -89,14 +88,13 @@ def display_final_evaluation_results(evaluation_results):
     st.subheader(" Final Resume Evaluation Results Summary")
 
     # === Overall Scores ===
-    eval_summary = evaluation_results.get("Evaluation_Summary", {})
-    match_with_jd = eval_summary.get("Match_Percentage", "N/A").strip()
-    qualification_status = eval_summary.get("Qualification_Status", "N/A")
-    exp_score = eval_summary.get("Experience_Score", "N/A")
-    skills_score = eval_summary.get("Skills_Score", "N/A")
-    edu_score = eval_summary.get("Education_Score", "N/A")
-    projects_score = eval_summary.get("Projects_Score", "N/A")  # Added projects score
-    overall_score = eval_summary.get("Overall_Weighted_Score", "N/A")
+    match_with_jd = evaluation_results.get("Match_Percentage", "N/A").strip()
+    qualification_status = evaluation_results.get("Qualification Status", "N/A")
+    exp_score = evaluation_results.get("Experience_Score", "N/A")
+    skills_score = evaluation_results.get("Skills_Score", "N/A")
+    edu_score = evaluation_results.get("Education_Score", "N/A")
+    projects_score = evaluation_results.get("Projects_Score", "N/A")  # Added projects score
+    overall_score = evaluation_results.get("Overall_Weighted_Score", "N/A")
 
     col_score1, col_score2, col_score3 = st.columns(3)
     with col_score1:
@@ -127,9 +125,8 @@ def display_final_evaluation_results(evaluation_results):
     st.markdown("---")
     st.markdown("#### Strengths and Areas for Improvement")
 
-    pros_and_cons = evaluation_results.get("Strengths_and_Weaknesses", {})
-    pros = pros_and_cons.get("Pros", [])
-    cons = pros_and_cons.get("Cons", [])
+    pros = evaluation_results.get("Pros", [])
+    cons = evaluation_results.get("Cons", [])
 
     col_pros, col_cons = st.columns(2)
     with col_pros:
@@ -152,14 +149,13 @@ def display_final_evaluation_results(evaluation_results):
     st.markdown("---")
     st.markdown("#### Skills Match Analysis")
 
-    skill_analysis = evaluation_results.get("Skill_Analysis", {})
-    skills_match = skill_analysis.get("Skills Match", [])
-    skills_not_matching = skill_analysis.get("Required_Skills_Missing_from_Resume", [])
-    extra_skills = skill_analysis.get("Extra skills", [])  # This alias is expected from the LLM JSON, so keep it.
+    skills_match = evaluation_results.get("Skills Match", [])
+    skills_not_matching = evaluation_results.get("Required_Skills_Missing_from_Resume", [])
+    extra_skills = evaluation_results.get("Extra skills", [])
 
     if skills_match:
         st.markdown("**Matching Skills:**")
-        st.info(",\n".join(skills_match))
+        st.info(",\n ".join(skills_match))
     else:
         st.warning("No direct skill matches found.")
 
@@ -173,32 +169,18 @@ def display_final_evaluation_results(evaluation_results):
     else:
         st.info("No additional skills beyond JD requirements identified.")
 
-    # === Key Considerations ===
     st.markdown("---")
-    st.markdown("#### Key Considerations")
+    st.markdown("#### Remarks")
 
-    key_considerations = evaluation_results.get("Key_Considerations", {})
-    kpis = key_considerations.get("Quantifiable_Achievements_Identified", [])
-    red_flags = key_considerations.get("Red_Flags_Noted", [])
-    overall_recommendation = key_considerations.get("Overall_Recommendation", "N/A")
+    comments = evaluation_results.get("Comments")
+    if comments:
+        st.markdown("**Comments**")
+        st.markdown(f"- {comments}")
 
-    if kpis:
-        st.markdown("** Quantifiable Achievements:**")
-        for kpi in kpis:
-            st.markdown(f"- {kpi}")
-    else:
-        st.info("No quantifiable achievements noted.")
-
-    if red_flags:
-        st.markdown("** Red Flags:**")
-        for flag in red_flags:
-            st.warning(f"- {flag}")
-    else:
-        st.success("No red flags identified.")
-
-    if overall_recommendation and overall_recommendation != "N/A":
-        st.markdown("** Final Recommendation:**")
-        st.markdown(f"- {overall_recommendation}")
+    summary_eval = evaluation_results.get("Summary")
+    if summary_eval:
+        st.markdown("**Summary**")
+        st.markdown(f"- {summary_eval}")
 
 
 # --- Report Page Logic ---
@@ -207,11 +189,10 @@ st.set_page_config(layout="wide", page_title="Resume Evaluation Report")
 st.title("Resume Evaluation Report")
 
 # Retrieve data from session state
-# Corrected: Use 'report_personal_details' to get the name consistently
 evaluation_results = st.session_state.get("report_evaluation_results")
 parsed_resume = st.session_state.get("report_parsed_resume")
-personal_details = st.session_state.get("report_personal_details", {})  # Get the personal details dict
-candidate_name = personal_details.get("Name", "N/A")  # Extract name from personal_details
+personal_details = st.session_state.get("report_personal_details", {})
+candidate_name = st.session_state.get("report_cand_name")
 
 if evaluation_results and parsed_resume:
     st.header(f"Report for: {candidate_name}")

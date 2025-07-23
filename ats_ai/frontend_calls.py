@@ -3,7 +3,7 @@ from typing import Any, Dict, Optional
 
 import requests
 
-BACKEND_URL = os.getenv("BACKEND_URL", default="http://backend:8000")
+BACKEND_URL = os.getenv("BACKEND_URL", default="http://localhost:8000")
 
 """
     Functions used by frontend streamlit to call server.
@@ -18,7 +18,6 @@ def upload_resume_file_to_backend(file, status_placeholder) -> Optional[str]:
     try:
         file.seek(0)  # Ensure file pointer is at the beginning
         files = {"resume_file": (file.name, file.getvalue(), file.type)}
-        status_placeholder.info(f"Uploading `{file.name}` to backend...")
         upload_response = requests.post(f"{BACKEND_URL}/upload_resume_file", files=files)
 
         if upload_response.status_code == 200:

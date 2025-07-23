@@ -308,6 +308,16 @@ EVALUATION_AND_PARSING_PROMPT = """
           "bullet point 1",
           "bullet point 2"
         ],
+        "Skills Match": [
+            "List specific skills explicitly mentioned in JD and found/used in resume (e.g., 'Node.js: used in API Gateway development, Enphase Energy')",
+            "List quantifiable outcomes tied to skills where possible (e.g., 'BiLSTM: achieved 92% accuracy in Phonocardiogram Project')"
+        ],
+        "Required_Skills_Missing_from_Resume": [
+            "List REQUIRED skills from JD that are absent or not demonstrated in the resume"
+        ],
+        "Extra skills": [
+            "List additional skills candidate has beyond job requirements (for context, do not factor into main scores)"
+        ],
         "Qualification Status": "Qualified / Not Qualified",
         "Missing_Requirements": [
           "list of key requirements from JD that are not met"
@@ -339,7 +349,9 @@ EVALUATION_AND_PARSING_PROMPT = """
             "Description": "brief role description or achievements"
           }}
         ],
-        "Skills": ["list", "of", "skills"],
+        "Programming_Language": ["list all programming languages mentioned"],
+        "Frameworks": ["list all frameworks, libraries, and significant tools (e.g., React, Express, Pandas, NumPy, Bootstrap, Spring Boot)"],
+        "Technologies": ["list all underlying technologies, platforms, and databases (e.g., AWS, Azure, Docker, Kubernetes, SQL, MongoDB, Git, Jenkins, Tableau, Salesforce, SharePoint)"],
         "Certifications": ["certification 1", "certification 2"],
         "Projects": [
           {{
