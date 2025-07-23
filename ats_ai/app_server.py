@@ -9,7 +9,11 @@ from pydantic import BaseModel
 from starlette import status
 from starlette.responses import RedirectResponse
 
-from ats_ai.agent.llm_agent import evaluate_resume_against_jd, extract_resume_info
+from ats_ai.agent.llm_agent import (
+    combined_parse_evaluate,
+    evaluate_resume_against_jd,
+    extract_resume_info,
+)
 
 RESUME_UPLOAD_FOLDER = "data/"
 JD_UPLOAD_FOLDER = "jd_json/"
@@ -103,6 +107,16 @@ async def evaluate_resume(payload: ResumeEvaluationRequest):
         return response
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to start LLM evaluation stream: {e}")
+
+
+@app.post("/parse_and_evaluate", status_code=status.HTTP_200_OK)
+async def parse_and_evaluate(combined_json: Dict[str, Any]):
+    resume_data = combined_json.get("resume_data")
+    jd_json = combined_json.get("jd_json")
+
+    print(resume_data, "\n\n", jd_json)
+
+    return await combined_parse_evaluate(resume_data, jd_json)
 
 
 @app.get("/")
