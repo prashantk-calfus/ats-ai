@@ -8,7 +8,7 @@ from fastapi import FastAPI, File, UploadFile, HTTPException, Request
 from pydantic import BaseModel
 from starlette import status
 from starlette.responses import RedirectResponse, JSONResponse
-
+import uvicorn
 from langchain_community.document_loaders import PyMuPDFLoader
 
 # ---- Import your agent functions ----
@@ -188,5 +188,4 @@ async def docs():
 
 # ---- Run ----
 if __name__ == "__main__":
-    import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
