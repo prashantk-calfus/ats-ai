@@ -18,7 +18,7 @@ services:
     image: ramdorak571/ats_ai_base:0.2.3
     platform: linux/amd64
     container_name: ats_streamlit
-    command: poetry run streamlit run ats_ai/deprecated_page.py --server.port 8501
+    command: poetry run streamlit run ats_ai/streamlit_app.py --server.port 8501
     ports:
       - "8501:8501"
     volumes:
