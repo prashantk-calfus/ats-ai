@@ -1,25 +1,35 @@
 JD_EXTRACTION_PROMPT = """
-You are an expert HR analyst AI.
+You are an expert HR analyst AI with the ability to distinguish between valid job descriptions and random text.
 
-Your task is to extract structured information from the provided job description (JD) text. Focus only on what is explicitly or strongly implied in the JD. Do not make assumptions or fabricate information.
+TASK 1: First, determine if the provided text is a legitimate job description.
+TASK 2: If it's a valid JD, extract structured information. If not, return empty structure.
+
+VALIDATION CRITERIA for a legitimate job description:
+- Contains job-related terminology and context
+- Has information about role responsibilities, requirements, or qualifications  
+- Mentions skills, experience, education, or job-related details
+- Is substantive enough to be a real job posting (not just greetings, names, or random words)
+- Written in a professional/business context
 
 CRITICAL RULES:
 1. Respond ONLY in valid JSON. Do NOT include commentary, explanations, or anything outside the JSON object.
-2. If a field is missing in the JD, return "NA" or an empty list as appropriate.
-3. Use the exact structure and keys as specified below.
-4. Be comprehensive, but avoid duplication or invented content.
+2. If the text is NOT a legitimate job description (e.g., casual messages, random text, greetings, single words), return the empty structure with all arrays as [] and strings as "".
+3. If it IS a legitimate job description, extract the information as specified.
+4. Use the exact structure and keys as specified below.
 
 RETURN FORMAT (strictly follow this):
 {{
-  "Job_Title": "Job title as mentioned",
-  "Required_Skills": ["list of must-have skills, tools, or technologies"],
-  "Preferred_Skills": ["list of nice-to-have skills or tools"],
-  "Minimum_Experience": "minimum experience required (e.g., '3+ years')",
-  "Location": "location mentioned (or 'Remote', 'Hybrid', or 'NA')",
-  "Responsibilities": ["key responsibilities extracted as list items"],
-  "Qualifications": ["required degrees, certifications, or qualifications"],
-  "Key considerations for hiring" : ["list down very important factors detrimental for hiring"]
+  "is_valid_jd": true/false,
+  "Job_Title": "Job title as mentioned or empty string if invalid",
+  "Required_Skills": ["list of must-have skills, tools, or technologies or empty array if invalid"],
+  "Preferred_Skills": ["list of nice-to-have skills or tools or empty array if invalid"],
+  "Minimum_Experience": "minimum experience required (e.g., '3+ years') or empty string if invalid",
+  "Location": "location mentioned (or 'Remote', 'Hybrid') or empty string if invalid",
+  "Responsibilities": ["key responsibilities extracted as list items or empty array if invalid"],
+  "Qualifications": ["required degrees, certifications, or qualifications or empty array if invalid"],
+  "Domain": "industry/domain (e.g., 'Technology', 'Healthcare') or empty string if invalid"
 }}
+
 
 JD TEXT:
 \"\"\"
@@ -368,3 +378,43 @@ EVALUATION_AND_PARSING_PROMPT = """
     Job Description: {job_description}
 
 """.strip()
+
+
+
+JD_VALIDATION_AND_EXTRACTION_PROMPT = """
+You are an AI assistant that analyzes text to determine if it's a valid job description and extracts structured information.
+
+First, analyze if the following text is a legitimate job description or just random text/greeting/name.
+
+Text to analyze:
+{{JD_TEXT}}
+
+If this is NOT a valid job description (like "see u", "hello", random text, just a name, etc.), respond with:
+{
+    "is_valid_jd": false,
+    "Job_Title": "",
+    "Required_Skills": [],
+    "Preferred_Skills": [],
+    "Minimum_Experience": "",
+    "Location": "",
+    "Responsibilities": [],
+    "Qualifications": [],
+    "Domain": ""
+}
+
+If this IS a valid job description, extract and structure the information as JSON:
+{
+    "is_valid_jd": true,
+    "Job_Title": "extracted job title",
+    "Required_Skills": ["skill1", "skill2"],
+    "Preferred_Skills": ["skill1", "skill2"],
+    "Minimum_Experience": "X years",
+    "Location": "location",
+    "Responsibilities": ["responsibility1", "responsibility2"],
+    "Qualifications": ["qualification1", "qualification2"],
+    "Domain": "domain/industry"
+}
+
+Respond ONLY with valid JSON, no additional text.
+"""
+

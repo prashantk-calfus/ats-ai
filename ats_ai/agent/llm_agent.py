@@ -55,23 +55,13 @@ def load_pdf_text(file_path: str) -> str:
 
 
 def extract_json_block(text: str) -> dict:
-    """
-    Extracts the first JSON block from a string (removes ```json ... ``` if present),
-    and returns it as a Python dictionary.
-    """
-    pattern = r"```json\s*(\{.*?\})\s*```"
-    match = re.search(pattern, text, re.DOTALL)
+    # Find JSON-like object
+    match = re.search(r'\{[\s\S]*\}', text)
+    if not match:
+        raise json.JSONDecodeError("No JSON object found", text, 0)
 
-    try:
-        if match:
-            cleaned_json = match.group(1).strip()
-        else:
-            cleaned_json = text.strip()
-
-        return json.loads(cleaned_json)
-
-    except json.JSONDecodeError as e:
-        raise ValueError(f"Failed to decode JSON: {e}\nRaw content: {text}")
+    raw_json = match.group()
+    return json.loads(raw_json)
 
 
 async def extract_resume_info(raw_resume_text: str):
