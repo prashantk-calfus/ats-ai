@@ -3,11 +3,8 @@ import logging
 import os
 import re
 import shutil
-from pathlib import Path
 from typing import Any, Dict
 
-import fitz
-import uvicorn
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from langchain_community.document_loaders import PyMuPDFLoader
 from pydantic import BaseModel
