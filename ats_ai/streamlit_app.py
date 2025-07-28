@@ -1,7 +1,6 @@
 import json
 import os
 from pathlib import Path
-
 import pymupdf
 import requests
 import streamlit as st
@@ -13,7 +12,7 @@ load_dotenv()
 BACKEND_URL = "http://localhost:8000"
 
 st.set_page_config(layout="wide", page_title="ATS AI")
-st.title("ATS AI : Resume Analyzer and Evaluator")
+st.title("ATS AI : Intelligent Resume Screening")
 
 if "parsed_data_combined" not in st.session_state:
     st.session_state.parsed_data_combined = None

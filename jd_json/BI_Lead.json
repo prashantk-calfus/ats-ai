@@ -1,0 +1,31 @@
+{
+  "Job_Title": "BI Lead",
+  "Required_Skills": [
+    "Power BI",
+    "Tableau",
+    "ETL processes",
+    "SQL Server",
+    "Python"
+  ],
+  "Preferred_Skills": [
+    "Azure SDK",
+    "Ability to interact with REST API's and perform web scraping tasks"
+  ],
+  "Minimum_Experience": "6-12 years",
+  "Location": "Pune",
+  "Responsibilities": [
+    "BI Architecture & DWH Solution Design",
+    "Data Integration",
+    "Data Modelling",
+    "Database Management",
+    "Visualization Development",
+    "Collaboration",
+    "Performance Optimization",
+    "Data Governance",
+    "Team Leadership"
+  ],
+  "Qualifications": [
+    "Bachelor’s degree in computer science, Information Systems, Data Science, or a related field"
+  ],
+  "Domain": "Business Intelligence/ Analytics"
+}

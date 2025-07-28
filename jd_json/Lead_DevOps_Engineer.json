@@ -1,0 +1,27 @@
+{
+  "Job_Title": "Lead DevOps Engineer",
+  "Required_Skills": [
+    "Linux based infrastructure",
+    "Scripting language",
+    "Cloud computing (network management, cloud computing and cloud databases in any one of the public clouds: AWS, Azure or GCP)",
+    "IAC (Infrastructure as Code) tools like Ansible, Terraform",
+    "Coding and scripting in at least one of the following: Shell, Python, Groovy"
+  ],
+  "Preferred_Skills": [
+    "Automation using scripting languages like Perl/python and shell scripts like BASH and CSH.",
+    "Good knowledge of configuration and building tools like Bazel, Jenkins etc.",
+    "Good knowledge of repository management tools like Git, Bit Bucket etc.",
+    "Good knowledge of monitoring solutions and generating insights into reporting"
+  ],
+  "Minimum_Experience": "8+ years",
+  "Location": "Pune",
+  "Responsibilities": [
+    "Managing and automate infrastructure, CI/CD pipelines, and development processes while ensuring security and system reliability",
+    "Collaborate with engineers, monitor system health, handle incidents, and contribute to project planning and decision-making"
+  ],
+  "Qualifications": [
+    "Proven experience as a DevOps Engineer or similar software engineering role.",
+    "Experience in establishing an optimized CI / CD environment relevant to the project."
+  ],
+  "Domain": "Software Development/DevOps"
+}

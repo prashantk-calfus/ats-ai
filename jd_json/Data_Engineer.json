@@ -1,0 +1,25 @@
+{
+  "Job_Title": "Data Engineer - BI Analytics & DWH",
+  "Required_Skills": [
+    "ETL/ELT development",
+    "data modeling",
+    "database design",
+    "SQL skills"
+  ],
+  "Preferred_Skills": [
+    "Tableau or Power BI"
+  ],
+  "Minimum_Experience": "3-4 years",
+  "Location": "Pune",
+  "Responsibilities": [
+    "ETL/ELT Development",
+    "Data Modeling & Warehousing",
+    "Database Engineering",
+    "BI & Visualization Support",
+    "Performance & Data Quality"
+  ],
+  "Qualifications": [
+    "Bachelor’s degree in Computer Science, Information Systems, Data Engineering, or a related field"
+  ],
+  "Domain": "Artificial Intelligence, Software Engineering, Enterprise Applications"
+}

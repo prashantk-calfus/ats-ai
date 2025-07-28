@@ -1,0 +1,45 @@
+{
+  "Job_Title": "Senior Software Engineer (Python)",
+  "Required_Skills": [
+    "Python",
+    "Object Oriented Python",
+    "Django",
+    "Flask",
+    "FastAPI",
+    "Pandas",
+    "NumPy",
+    "Sklearn",
+    "RESTful API",
+    "SQL",
+    "relational databases like PostgreSQL, MySQL",
+    "Experience with Docker"
+  ],
+  "Preferred_Skills": [
+    "MongoDB",
+    "DynamoDB",
+    "experience with cloud technologies such as AWS or Microsoft Azure"
+  ],
+  "Minimum_Experience": "5 to 7 years of experience in software development processes",
+  "Location": "Bengaluru",
+  "Responsibilities": [
+    "Design and Development",
+    "Leadership & Mentorship",
+    "Collaboration",
+    "Code Quality Assurance",
+    "Troubleshooting and Debugging",
+    "Staying Informed",
+    "Performance Optimization",
+    "Documentation"
+  ],
+  "Qualifications": [
+    "Hands on experience with Object Oriented Python",
+    "Good knowledge of the popular web frameworks and libs",
+    "Knowledge of data-processing libs",
+    "A good understanding of RESTful API",
+    "Good working understanding of cloud technologies such as AWS or Microsoft Azure",
+    "Good working understanding of SQL and relational databases like PostgreSQL, MySQL, etc.",
+    "Experience with Docker",
+    "Strong testing and debugging skills"
+  ],
+  "Domain": "Software Development/Engineering"
+}

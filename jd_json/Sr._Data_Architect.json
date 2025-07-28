@@ -1,0 +1,36 @@
+{
+  "Job_Title": "Sr. Data Architect",
+  "Required_Skills": [
+    "Databricks",
+    "Apache Spark",
+    "Delta Lake",
+    "SQL",
+    "Python",
+    "Scala"
+  ],
+  "Preferred_Skills": [
+    "Databricks certifications (Databricks Certified Data Engineer/Architect)",
+    "Data streaming technologies (Kafka, Spark Streaming)",
+    "Agentic frameworks, AI orchestration tools, and multi-agent systems",
+    "ML & AI platforms (e.g., SageMaker, Vertex AI, Azure ML)"
+  ],
+  "Minimum_Experience": "10+ years",
+  "Location": "Bengaluru, San Francisco Bay Area, CA",
+  "Responsibilities": [
+    "Architect & Implement Scalable Data Solutions",
+    "Data Integration & Pipelines",
+    "Cloud Data Management",
+    "Performance Optimization",
+    "Data Governance & Security",
+    "Collaboration & Leadership",
+    "Machine Learning, Analytics & Agents Enablement",
+    "Technical Documentation"
+  ],
+  "Qualifications": [
+    "10+ years of experience in Data Architecture",
+    "Proficiency in SQL, Python, Scala, and Cloud platforms (Azure, AWS, GCP)",
+    "Deep understanding of Delta Lake, Medallion Architecture, and Data Engineering best practices",
+    "Experience in data governance, cataloging, and security"
+  ],
+  "Domain": "Data Science, Big Data"
+}

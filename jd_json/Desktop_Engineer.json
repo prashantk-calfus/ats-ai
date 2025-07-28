@@ -1,0 +1,24 @@
+{
+  "Job_Title": "Desktop Engineer",
+  "Required_Skills": [
+    "Strong working knowledge of Windows operating systems.",
+    "Proficiency with Microsoft 365, Active Directory, and remote support tools.",
+    "Basic understanding of networking concepts (TCP/IP, DNS, DHCP)."
+  ],
+  "Preferred_Skills": [
+    "Experience with MacOS support.",
+    "Hands-on experience with Microsoft 365 administration tools (Intune, Exchange Online, Entra ID, Teams, SharePoint)"
+  ],
+  "Minimum_Experience": "1-2 years",
+  "Location": "Pune",
+  "Responsibilities": [
+    "Install, configure, and troubleshoot desktop computers, software, printers, and other peripherals.",
+    "Perform onboarding and offboarding tasks...",
+    "Manage user accounts, groups, mailboxes and access rights..."
+  ],
+  "Qualifications": [
+    "Bachelor’s degree in computer science, Information Technology, or a related field.",
+    "Strong analytical and troubleshooting skills."
+  ],
+  "Domain": "Information Technology"
+}

@@ -1,0 +1,28 @@
+{
+  "Job_Title": "Technical Lead - Gen AI",
+  "Required_Skills": [
+    "Python backend development",
+    "Full-stack web development",
+    "Generative AI technologies (e.g., GPT-3, GPT-4, transformers, deep learning models)",
+    "Web frameworks (e.g., Django, Flask, Fast API)",
+    "Frontend technologies (React, Vue.js, Angular)"
+  ],
+  "Preferred_Skills": [],
+  "Minimum_Experience": "7+ years",
+  "Location": "Pune",
+  "Responsibilities": [
+    "Lead Technical Strategy: Define, design, and implement full-stack architecture using Python for backend and modern frontend technologies (React, Angular, etc.)",
+    "Generative AI Expertise: Leverage AI/ML models, specifically generative models (e.g.GPT, LLMs), in building innovative and scalable solutions.",
+    "Team Leadership: Lead a cross-functional team of developers and engineers, ensuring efficient collaboration and timely delivery of high-quality software.",
+    "Mentorship: Mentor and guide junior and mid-level engineers, providing support in both technical growth and career development.",
+    "Collaboration: Work closely with product managers, data scientists, and UI/UX teams to understand requirements and deliver end-to-end solutions.",
+    "Code Reviews & Best Practices: Ensure coding best practices, code quality, and maintainability through regular code reviews and adherence to design patterns.",
+    "Cloud Integration: Utilize cloud services (AWS, GCP, Azure) to deploy and manage scalable applications and AI models.",
+    "Continuous Improvement: Stay updated with the latest trends in full-stack development, Python frameworks, and AI technologies to continuously improve the development process and product."
+  ],
+  "Qualifications": [
+    "Bachelor’s or Master’s degree in Computer Science, Engineering, or a related field.",
+    "7+ years of experience in Python backend development and full-stack web development."
+  ],
+  "Domain": "Artificial Intelligence/Computer Science"
+}

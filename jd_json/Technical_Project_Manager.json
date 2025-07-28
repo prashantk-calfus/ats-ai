@@ -1,0 +1,27 @@
+{
+  "Job_Title": "Technical Project Manager",
+  "Required_Skills": [
+    "Strong leadership skills",
+    "Project management skills",
+    "Technical skills",
+    "Programming background in Node JS/Java/Python, React.js/Angular",
+    "Experience in cloud architecture and technology"
+  ],
+  "Preferred_Skills": [
+    "PMP, ScrumMaster, or other relevant certifications",
+    "Understanding of DevOps and CI/CD practices"
+  ],
+  "Minimum_Experience": "10+ years with at least 5+ years in a technical or IT-focused environment",
+  "Location": "Pune",
+  "Responsibilities": [
+    "Manage project teams",
+    "Define project scope",
+    "Create timelines",
+    "Allocate resources and monitor project progress"
+  ],
+  "Qualifications": [
+    "Proven track record of delivering complex projects on time, within scope, and on budget",
+    "Strong understanding of software development processes, methodologies (Agile, Scrum, Waterfall), and tools"
+  ],
+  "Domain": "Software Development/IT Project Management"
+}

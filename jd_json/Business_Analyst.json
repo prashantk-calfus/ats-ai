@@ -1,0 +1,26 @@
+{
+  "Job_Title": "Business Analyst",
+  "Required_Skills": [
+    "Strong analytical and problem-solving skills, with the ability to interpret complex data and make informed decisions.",
+    "Excellent verbal and written communication skills, capable of conveying technical information to non-technical stakeholders."
+  ],
+  "Preferred_Skills": [],
+  "Minimum_Experience": "5+ years",
+  "Location": "Bengaluru",
+  "Responsibilities": [
+    "Requirements Gathering: Collaborate with stakeholders to gather and document business requirements for data migration, disaster recovery, and backup management projects.",
+    "Solution Design: Analyze existing data systems and processes to design effective data migration strategies and disaster recovery plans that align with business objectives.",
+    "Data Analysis: Conduct thorough analysis of data sources, structures, and dependencies to ensure accurate and efficient data migration with minimal disruption.",
+    "Project Coordination: Work closely with project managers, IT teams, and external vendors to ensure successful implementation of data migration and recovery solutions.",
+    "Risk Assessment: Identify potential risks and challenges in data migration and disaster recovery processes, proposing mitigation strategies to stakeholders.",
+    "Documentation: Create comprehensive documentation, including process flows, data mappings, and recovery plans, to facilitate understanding and compliance among team members.",
+    "Testing and Validation: Collaborate with quality assurance teams to develop test plans, validate data integrity post-migration, and ensure disaster recovery protocols function as intended.",
+    "Training and Support: Provide training and support to end-users and stakeholders on new systems and processes related to data migration and recovery management.",
+    "Continuous Improvement: Stay updated on industry best practices and emerging technologies in data management, recommending enhancements to existing processes."
+  ],
+  "Qualifications": [
+    "Bachelor’s degree in business administration, Information Technology, or a related field.",
+    "5+ years of experience as a Business Analyst, with a focus on data migration, disaster recovery, or backup management will be an added advantage."
+  ],
+  "Domain": "Data Management"
+}
