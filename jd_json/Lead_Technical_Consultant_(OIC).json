@@ -1,0 +1,25 @@
+{
+  "Job_Title": "Lead Technical Consultant (OIC)",
+  "Required_Skills": [
+    "Oracle PaaS",
+    "OIC",
+    "VBCS",
+    "OTBI",
+    "BI Publisher",
+    "FRS"
+  ],
+  "Preferred_Skills": [],
+  "Minimum_Experience": "8 to 12 Years",
+  "Location": "Pune",
+  "Responsibilities": [
+    "Work as member of Cloud SaaS/EBS implementation team, looking after the technology track with focus on technical development.",
+    "Collaborate with functional and client BA team to finalize the technical specifications aligned with the business requirements.",
+    "Lead a team of technical consultants for design and delivery.",
+    "Collect user feedback, disposition, and remediation activities as part of solution testing phase."
+  ],
+  "Qualifications": [
+    "Bachelor's degree in computer science or equivalent",
+    "Proven experience in Oracle PaaS, OIC, VBCS, OTBI, BI Publisher and FRS (non-mandatory) reporting in Oracle ERP or Finance tracks."
+  ],
+  "Domain": "IT/Software"
+}

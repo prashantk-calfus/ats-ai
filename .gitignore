@@ -8,7 +8,7 @@ None/
 # Data Folder
 jd
 data
-jd_json
+#jd_json
 
 # Test files
 .coverage

@@ -1,0 +1,24 @@
+{
+  "Job_Title": "Senior Software Engineer – Gen AI",
+  "Required_Skills": [
+    "Python (backend)",
+    "Generative AI models (LLMs) and other generative models (e.g., GPT-3/4, transformers)",
+    "Cloud platforms (AWS, GCP, or Azure)"
+  ],
+  "Preferred_Skills": [
+    "React",
+    "Angular"
+  ],
+  "Minimum_Experience": "4–7 years",
+  "Location": "Pune",
+  "Responsibilities": [
+    "Design and develop robust full-stack applications",
+    "Apply LLMs and other generative models to build scalable, intelligent systems",
+    "Contribute to the architectural design of AI-powered products"
+  ],
+  "Qualifications": [
+    "Bachelor’s or Master’s degree in Computer Science, Engineering, or related field",
+    "4–7 years of hands-on experience in full-stack software development with a strong focus on Python-based backends"
+  ],
+  "Domain": "Software Development/Artificial Intelligence"
+}

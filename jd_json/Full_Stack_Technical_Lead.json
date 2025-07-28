@@ -1,0 +1,26 @@
+{
+  "Job_Title": "Full Stack Technical Lead",
+  "Required_Skills": [
+    "Software architecture",
+    "Front-end and back-end technologies",
+    "Secure coding practices",
+    "Data encryption",
+    "Authentication and authorization",
+    "GDPR, PCI-DSS"
+  ],
+  "Preferred_Skills": [],
+  "Minimum_Experience": "5-8 years",
+  "Location": "San Francisco Bay Area, CA / Bengaluru",
+  "Responsibilities": [
+    "Architectural Design",
+    "Full Stack Development",
+    "Collaboration",
+    "Technical Leadership",
+    "Quality Assurance",
+    "Cloud Services"
+  ],
+  "Qualifications": [
+    "Bachelor’s degree in Computer Science, Information Technology, or related field"
+  ],
+  "Domain": "Software Engineering/Technology"
+}

@@ -1,13 +1,14 @@
 .PHONY: local prod make_env install_poetry ui install backend
 
-VERSION:=0.2.3
+VERSION := $(shell awk -F '"' '/^version =/ { print $$2 }' pyproject.toml)
 PYTHON_VERSION := $(shell awk -F '"' '/^python =/ { print $$2 }' pyproject.toml)
 POETRY_HOME := $(shell echo $$HOME/.local/bin)
 VENV_DIR := .venv
+PROD_IMAGE := ramdorak571/ats_ai_base:$(VERSION)
+LOCAL_IMAGE := ats_ai_base:$(VERSION)
 
-
-prod:
-	docker compose up
+prod: build
+	PROD_IMAGE=$(LOCAL_IMAGE) docker compose up -d
 
 local: install
 	chmod +x start.sh
@@ -24,10 +25,10 @@ install: make_env
 	poetry run pre-commit install
 
 build:
-	docker build --platform linux/amd64 -t ramdorak571/ats_ai_base:$(VERSION) .
+	docker build --platform linux/amd64 -t $(LOCAL_IMAGE) .
 
 push:
-	docker push ramdorak571/ats_ai_base:$(VERSION)
+	docker push $(PROD_IMAGE)
 
 make_env:
 	# Checks if venv is created or not

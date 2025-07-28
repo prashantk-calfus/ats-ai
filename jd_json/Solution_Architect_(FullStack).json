@@ -1,0 +1,30 @@
+{
+  "Job_Title": "Solution Architect (FullStack)",
+  "Required_Skills": [
+    "software architecture",
+    "front-end and back-end technologies",
+    "secure coding practices",
+    "data encryption",
+    "authentication and authorization"
+  ],
+  "Preferred_Skills": [
+    "microservices, serverless architecture and modular systems design",
+    "multi-program ability and mastery of systems architecture with an expansive set of tech skills like cybersecurity, database management, a mix of front and backend programming using CSS/HTML, React and Node.js, Java, Python programming"
+  ],
+  "Minimum_Experience": "8-12 years",
+  "Location": "Pune",
+  "Responsibilities": [
+    "Architectural Design",
+    "Full Stack Development",
+    "Collaboration",
+    "Technical Leadership",
+    "Quality Assurance",
+    "Cloud Services",
+    "Documentation"
+  ],
+  "Qualifications": [
+    "Bachelor’s degree in Computer Science, Information Technology, or related field.",
+    "8-12 years of experience in software development, with at least 5 years in a solution architect role."
+  ],
+  "Domain": "Software Development/IT"
+}

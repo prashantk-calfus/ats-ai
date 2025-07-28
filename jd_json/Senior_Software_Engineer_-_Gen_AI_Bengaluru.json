@@ -1,0 +1,22 @@
+{
+  "Job_Title": "Senior Software Engineer - Gen AI",
+  "Required_Skills": [
+    "Python (backend)",
+    "Generative models (LLMs) and other generative models (e.g., GPT-3/4, transformers)",
+    "Cloud infrastructure",
+    "Web and mobile solutions"
+  ],
+  "Preferred_Skills": [],
+  "Minimum_Experience": "4–7 years",
+  "Location": "Bengaluru",
+  "Responsibilities": [
+    "Design and develop robust full-stack applications",
+    "Apply LLMs and other generative models to build scalable, intelligent systems",
+    "Contribute to the architectural design of AI-powered products"
+  ],
+  "Qualifications": [
+    "Bachelor’s or Master’s degree in Computer Science, Engineering, or related field",
+    "Experience building and integrating generative AI models (e.g., GPT-3, GPT-4, transformers, RAG pipelines)"
+  ],
+  "Domain": "Artificial Intelligence"
+}

@@ -22,6 +22,7 @@ RUN poetry config virtualenvs.create false \
 COPY ats_ai ./ats_ai
 COPY .streamlit ./.streamlit
 COPY jd_json ./jd_json
+COPY jd_folder ./jd_folder
 
 # Create log directory (in case it isn't mounted)
 RUN mkdir -p ..logs

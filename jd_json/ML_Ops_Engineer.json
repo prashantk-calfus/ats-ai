@@ -1,0 +1,32 @@
+{
+  "Job_Title": "ML Ops Engineer",
+  "Required_Skills": [
+    "data engineering tools and technologies such as Apache Kafka, Apache Spark, Hadoop, Airflow, and Kubernetes",
+    "cloud platforms (AWS, GCP, Azure) and data storage technologies such as S3, BigQuery, Redshift, and HDFS",
+    "programming and scripting languages such as Python, Bash, Go, or similar",
+    "infrastructure automation tools (e.g., Terraform, Ansible, CloudFormation)",
+    "containerization and orchestration technologies (Docker, Kubernetes)",
+    "monitoring tools (e.g., Prometheus, Grafana, Datadog) and observability practices"
+  ],
+  "Preferred_Skills": [
+    "machine learning lifecycle management tools (e.g., MLflow, Kubeflow)",
+    "serverless computing frameworks and data engineering tools",
+    "working with GPU and distributed computing frameworks (e.g., TensorFlow on GPUs)"
+  ],
+  "Minimum_Experience": "3+ years of experience as an SRE, DevOps Engineer, Data Engineer, or similar role",
+  "Location": "Pune",
+  "Responsibilities": [
+    "Data Infrastructure Reliability",
+    "Cloud and On-premises Infrastructure Management",
+    "Monitoring and Automation",
+    "Collaboration with Data Science & Engineering Teams",
+    "Incident Response and Troubleshooting",
+    "Security and Compliance",
+    "Optimization and Cost Efficiency"
+  ],
+  "Qualifications": [
+    "Bachelor’s degree in Computer Science, Engineering, Data Science, or a related field",
+    "Experience working with large-scale data pipelines and infrastructure"
+  ],
+  "Domain": "Data Science/Machine Learning/AI"
+}

@@ -1,0 +1,34 @@
+{
+  "Job_Title": "QA Engineer (Python/Golang)",
+  "Required_Skills": [
+    "API testing",
+    "Ginkgo and Gomega frameworks",
+    "RESTful APIs",
+    "Cloud platforms (AWS, Azure, GCP) and their storage services",
+    "JSD, Swagger/OpenAPI specs"
+  ],
+  "Preferred_Skills": [
+    "CI/CD tools (e.g., Jenkins, GitLab CI)",
+    "Storage protocols (e.g., NFS, SMB, iSCSI) and file systems",
+    "Background in storage domain or data migration projects",
+    "Understanding of virtualization and container orchestration (e.g., Docker, Kubernetes)",
+    "Exposure to performance testing using JMeter, or similar"
+  ],
+  "Minimum_Experience": "3+ years",
+  "Location": "Bengaluru",
+  "Responsibilities": [
+    "API Automation: Design and implement automated test suites for RESTful APIs and storage services.",
+    "Framework Development: Build and maintain scalable automation frameworks tailored for API validation and integration testing.",
+    "Test Strategy: Define and execute test strategies focused on performance, reliability, and scalability of storage APIs.",
+    "Cloud & Hyperscale Testing: Validate API behavior and performance in hyperscale environments (AWS, Azure, GCP).",
+    "Collaboration: Work closely with development, DevOps, and product teams to integrate API testing into CI/CD workflows.",
+    "Troubleshooting: Analyze test failures, debug issues, and collaborate with engineering teams to resolve defects.",
+    "Documentation: Maintain clear and comprehensive documentation of test plans, test cases, and results."
+  ],
+  "Qualifications": [
+    "Bachelor's degree in computer science, IT, or related field",
+    "Strong problem-solving and analytical skills",
+    "Excellent communication and documentation abilities"
+  ],
+  "Domain": "Software Development/Technology"
+}

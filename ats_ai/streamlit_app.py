@@ -1,371 +1,522 @@
 import json
 import os
-from typing import Any, Dict
+import time
 
+import pymupdf
 import requests
 import streamlit as st
-from frontend_calls import (
-    evaluate_resume_with_backend,
-    parse_resume_from_backend,
-    upload_resume_file_to_backend,
-)
+from dotenv import load_dotenv
 
-BACKEND_URL = os.getenv("BACKEND_URL", default="http://backend:8000")
-JD_OPTIONS = {
-    "Select a pre-existing JD": "Select a pre-existing JD",
-    "Senior Python Development Engineer": "jd_json/SrPDE.json",
-    "Oracle ERP": "jd_json/OracleERP.json",
-    "Data Architect": "jd_json/DataArchJD.json",
-    "Senior Full Stack Engineer": "jd_json/SeniorFullStackEngineer_Python.json",
-}
+load_dotenv()
+
+BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000/")
+
+st.set_page_config(layout="wide", page_title="ATS AI")
+st.title("ATS AI : Intelligent Resume Screening")
+
+# Initialize all session state variables
+if "parsed_data_combined" not in st.session_state:
+    st.session_state.parsed_data_combined = None
+if "decision_made" not in st.session_state:
+    st.session_state.decision_made = None
+if "uploaded_resume_name" not in st.session_state:
+    st.session_state.uploaded_resume_name = None
+
+if "report_evaluation_results" not in st.session_state:
+    st.session_state.report_evaluation_results = None
+if "report_parsed_resume" not in st.session_state:
+    st.session_state.report_parsed_resume = None
+if "report_cand_name" not in st.session_state:
+    st.session_state.report_cand_name = None
+
+# Initialize JD text input state
+if "jd_text_input" not in st.session_state:
+    st.session_state.jd_text_input = ""
+if "jd_name_input" not in st.session_state:
+    st.session_state.jd_name_input = ""
+if "clear_jd_form" not in st.session_state:
+    st.session_state.clear_jd_form = False
+
+# NEW: Initialize JD change tracking variables
+if "current_selected_jd" not in st.session_state:
+    st.session_state.current_selected_jd = None
+if "current_jd_text" not in st.session_state:
+    st.session_state.current_jd_text = ""
+if "current_jd_name" not in st.session_state:
+    st.session_state.current_jd_name = ""
+
+uploaded_resume = st.file_uploader("Upload resume file (PDF)", type=["pdf"])
+
+if uploaded_resume is not None:
+    if st.session_state.uploaded_resume_name != uploaded_resume.name:
+        st.session_state.uploaded_resume_name = uploaded_resume.name
+        st.session_state.parsed_data_combined = None
+        st.session_state.decision_made = None
+else:
+    if st.session_state.uploaded_resume_name is not None:
+        st.session_state.uploaded_resume_name = None
+        st.session_state.parsed_data_combined = None
+        st.session_state.decision_made = None
+
+# JD Selection Section with Tabs
+st.header("Job Description")
+
+tab1, tab2 = st.tabs(["📋 Select Existing JD", "💾 Add New JD"])
+
+jd_content = None
+jd_source = None
+
+with tab1:
+    st.info("Select from previously saved Job Descriptions")
+
+    # Fetch existing JDs from backend
+    try:
+        response = requests.get(f"{BACKEND_URL}/list_jds")
+        if response.status_code == 200:
+            existing_jds_response = response.json()
+            existing_jds = existing_jds_response.get("jds", [])
+            jd_options = ["Select a pre-existing JD"] + existing_jds
+            selected_jd_display = st.selectbox("Choose a Job Description:", options=jd_options, index=0, key="jd_dropdown")
+
+            if selected_jd_display != "Select a pre-existing JD":
+                # NEW: Check if JD selection has changed
+                if st.session_state.get("current_selected_jd") != selected_jd_display:
+                    st.session_state.current_selected_jd = selected_jd_display
+                    # Reset evaluation state when JD changes
+                    st.session_state.parsed_data_combined = None
+                    st.session_state.decision_made = None
+                    st.session_state.report_evaluation_results = None
+                    st.session_state.report_parsed_resume = None
+                    st.session_state.report_cand_name = None
+
+                # Load the selected JD file
+                try:
+                    jd_filename = f"{selected_jd_display}.json"
+                    jd_path = os.path.join("jd_json", jd_filename)
+                    if os.path.exists(jd_path):
+                        with open(jd_path, "r") as f:
+                            jd_content = json.load(f)
+                        jd_source = f"Selected JD: {selected_jd_display}"
+                        st.success(f"✅ Using selected JD: **{selected_jd_display}**")
+                    else:
+                        st.warning(f"JD file not found locally: {jd_filename}")
+                except Exception as e:
+                    st.error(f"Error loading selected JD: {str(e)}")
+            else:
+                # Reset when no JD is selected
+                if st.session_state.get("current_selected_jd") is not None:
+                    st.session_state.current_selected_jd = None
+                    st.session_state.parsed_data_combined = None
+                    st.session_state.decision_made = None
+                    st.session_state.report_evaluation_results = None
+                    st.session_state.report_parsed_resume = None
+                    st.session_state.report_cand_name = None
+        else:
+            st.error("Failed to load existing JDs from backend")
+            existing_jds = []
+            selected_jd_display = "Select a pre-existing JD"
+    except Exception as e:
+        st.error(f"Error connecting to backend: {str(e)}")
+        existing_jds = []
+        selected_jd_display = "Select a pre-existing JD"
+
+with tab2:
+    st.info("Add a new Job Description")
+
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        jd_name_input = st.text_input("JD Name:", placeholder="e.g., Senior Python Developer", key="jd_name_input_field", value="" if st.session_state.clear_jd_form else st.session_state.jd_name_input)
+
+    with col2:
+        jd_text_input = st.text_area("JD Text:", height=150, placeholder="Paste the job description text here...", key="jd_text_input_field", value="" if st.session_state.clear_jd_form else st.session_state.jd_text_input)
+
+    # NEW: Check if JD text input has changed
+    if jd_text_input != st.session_state.current_jd_text or jd_name_input != st.session_state.current_jd_name:
+        st.session_state.current_jd_text = jd_text_input
+        st.session_state.current_jd_name = jd_name_input
+        # Reset evaluation state when JD text changes
+        if jd_text_input and jd_name_input:  # Only reset if both fields have content
+            st.session_state.parsed_data_combined = None
+            st.session_state.decision_made = None
+            st.session_state.report_evaluation_results = None
+            st.session_state.report_parsed_resume = None
+            st.session_state.report_cand_name = None
+            # Also reset selected JD to avoid conflicts
+            st.session_state.current_selected_jd = None
+
+    # Reset the clear trigger
+    if st.session_state.clear_jd_form:
+        st.session_state.clear_jd_form = False
+
+    col_save, col_use = st.columns([1, 1])
+
+    with col_save:
+        if st.button("💾 Save JD", key="save_jd_btn"):
+            if jd_name_input and jd_text_input:
+                with st.spinner("🤖 Analyzing JD with AI intelligence..."):
+                    try:
+                        # Use the enhanced endpoint
+                        save_response = requests.post(f"{BACKEND_URL}/save_jd_raw_text/", json={"jd_name": jd_name_input, "jd_text": jd_text_input})
+
+                        if save_response.status_code == 200:
+                            response_data = save_response.json()
+                            is_valid_jd = response_data.get("is_valid_jd", True)
+                            validation_method = response_data.get("validation_method", "AI analysis")
+
+                            if is_valid_jd:
+                                st.success(f"✅ JD '{jd_name_input}' saved successfully!")
+
+                            else:
+                                # Show error message for invalid JD and auto-hide after 2 minutes
+                                error_placeholder = st.empty()
+                                with error_placeholder.container():
+                                    st.error(f"❌ '{jd_name_input}' is not a valid job description!")
+
+                                # Auto-clear the error message after 2 minutes (120 seconds)
+                                import threading
+
+                                def clear_error():
+                                    import time
+
+                                    time.sleep(120)  # 2 minutes
+                                    error_placeholder.empty()
+
+                                threading.Thread(target=clear_error, daemon=True).start()
+
+                            # Clear fields only if valid JD was saved
+                            if is_valid_jd:
+                                st.session_state.jd_name_input = ""
+                                st.session_state.jd_text_input = ""
+                                st.session_state.show_nav_message = True
+                                st.session_state.nav_message_time = time.time()
+                                st.session_state.clear_jd_form = True
+                                st.rerun()
+
+                        else:
+                            error_detail = save_response.json().get("detail", save_response.text)
+                            st.error(f"❌ Failed to save JD: {error_detail}")
+
+                    except requests.exceptions.ConnectionError:
+                        st.error("🔌 Could not connect to the backend server. Please make sure it's running.")
+                    except requests.exceptions.RequestException as e:
+                        st.error(f"🌐 Network error: {str(e)}")
+                    except json.JSONDecodeError:
+                        st.error("📄 Invalid response format from server.")
+                    except Exception as e:
+                        st.error(f"💥 Unexpected error: {str(e)}")
+            else:
+                st.warning("📝 Please provide both JD name and JD text")
+
+    if st.session_state.get("show_nav_message", False) and st.session_state.get("nav_message_time"):
+        import time
+
+        elapsed_time = time.time() - st.session_state.nav_message_time
+        if elapsed_time < 120:  # 2 minutes = 120 seconds
+            st.info("📋 Now go to 'Select Existing JD' tab to choose your saved JD and then click the Evaluate button!")
+        else:
+            st.session_state.show_nav_message = False
+            st.session_state.nav_message_time = None
+
+# Determine JD content for evaluation
+if "selected_jd_display" in locals() and selected_jd_display != "Select a pre-existing JD":
+    # Using selected JD
+    pass
+elif jd_text_input:
+    # Using text input JD - parse it for evaluation
+    if not jd_content:
+        try:
+            parse_response = requests.post(f"{BACKEND_URL}/save_jd_raw_text", data=jd_text_input.encode("utf-8"), headers={"Content-Type": "text/plain"})
+            if parse_response.status_code == 200:
+                response_data = parse_response.json()
+                jd_content = response_data.get("parsed_data")
+                jd_source = f"Text Input JD: {jd_name_input or 'Unnamed JD'}"
+        except:
+            pass
+
+# UPDATED: Single Evaluation Button with improved logic
+if st.session_state.uploaded_resume_name and (jd_content or jd_text_input):
+    # Always enable the button for re-evaluation
+    evaluate_button_disabled = False
+
+    # Show re-evaluation message if already evaluated
+    if st.session_state.parsed_data_combined is not None:
+        st.info("🔄 Click to re-evaluate with the current JD selection")
+
+    col_eval, col_clear = st.columns([2, 1])
+
+    with col_eval:
+        if st.button("🚀 Evaluate", disabled=evaluate_button_disabled):
+            # Reset previous results before new evaluation
+            st.session_state.parsed_data_combined = None
+            st.session_state.decision_made = None
+            st.session_state.report_evaluation_results = None
+            st.session_state.report_parsed_resume = None
+            st.session_state.report_cand_name = None
+
+            with st.spinner("Processing resume and evaluating..."):
+                try:
+                    # Read resume text
+                    resume_pdf_reader = pymupdf.open(stream=uploaded_resume.getvalue(), filetype="pdf")
+                    resume_text = ""
+                    for i in range(resume_pdf_reader.page_count):
+                        page = resume_pdf_reader.load_page(i)
+                        resume_text += page.get_text()
+
+                    # Upload resume file
+                    files = {"resume_file": (uploaded_resume.name, uploaded_resume.getvalue(), uploaded_resume.type)}
+                    upload_response = requests.post(f"{BACKEND_URL}/upload_resume_file", files=files)
+
+                    if upload_response.status_code != 200:
+                        st.error(f"Failed to upload resume to backend: {upload_response.status_code} - {upload_response.text}")
+                        st.session_state.parsed_data_combined = None
+                        st.session_state.decision_made = None
+                    else:
+                        # Use existing JD or parse text JD
+                        final_jd_content = jd_content
+                        if not final_jd_content and jd_text_input:
+                            # Parse JD text
+                            parse_response = requests.post(f"{BACKEND_URL}/save_jd_raw_text", data=jd_text_input.encode("utf-8"), headers={"Content-Type": "text/plain"})
+                            if parse_response.status_code == 200:
+                                response_data = parse_response.json()
+                                final_jd_content = response_data.get("parsed_data")
+
+                        if final_jd_content:
+                            combined_json = {"resume_data": resume_text, "jd_json": final_jd_content}
+                            response = requests.post(f"{BACKEND_URL}/parse_and_evaluate", json=combined_json)
+
+                            if response.status_code == 200:
+                                st.session_state.parsed_data_combined = response.json()
+                                st.success("✅ Evaluation Complete!")
+                            else:
+                                st.error(f"Evaluation failed: {response.status_code} - {response.text}")
+                                st.session_state.parsed_data_combined = None
+                                st.session_state.decision_made = None
+                        else:
+                            st.error("Failed to process Job Description")
+                except Exception as e:
+                    st.error(f"An error occurred during evaluation: {e}")
+                    st.session_state.parsed_data_combined = None
+                    st.session_state.decision_made = None
 
 
-def display_parsed_resume_in_markdown(parsed_resume_data: Dict[str, Any]):
-    """
-    Displays the parsed resume information in a user-friendly Markdown format.
-    """
-    st.markdown("#### Personal Information")
-    st.write(f"**Name:** {parsed_resume_data.get('Name', 'N/A')}")
+# Display Results - SCOREBOARD FIRST, then parsed resume details
+if st.session_state.parsed_data_combined:
+    parsed_resume_data = st.session_state.parsed_data_combined.get("Parsed_Resume")
+    eval_results = st.session_state.parsed_data_combined.get("Evaluation")
 
-    contact_details = parsed_resume_data.get("Contact_Details", {})
-    if contact_details:
-        st.write(f"**Mobile No:** {contact_details.get('Mobile_No', 'N/A')}")
-        st.write(f"**Email:** {contact_details.get('Email', 'N/A')}")
-    else:
-        st.write("**Contact Details:** Not provided")
+    candidate_name = parsed_resume_data.get("Name", "Candidate")
+    st.header(f"📊 Evaluation Report for: {candidate_name}")
 
-    st.write(f"**GitHub:** {parsed_resume_data.get('Github_Repo', 'N/A')}")
-    st.write(f"**LinkedIn:** {parsed_resume_data.get('LinkedIn', 'N/A')}")
-
+    # SCOREBOARD SECTION - DISPLAYED FIRST
     st.markdown("---")
-    st.markdown("#### Education")
-    education_entries = parsed_resume_data.get("Education", [])
-    if education_entries:
-        for edu in education_entries:
-            st.markdown(f"**{edu.get('Degree', 'N/A')}** at {edu.get('Institution', 'N/A')}")
-            st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;*Score:* {edu.get('Score', 'N/A')}, *Duration:* {edu.get('Duration', 'N/A')}")
-    else:
-        st.info("No education details provided.")
+    st.subheader("🏆 Overall Performance")
 
-    st.markdown("---")
-    st.markdown("#### Professional Experience")
-    experience_entries = parsed_resume_data.get("Professional_Experience", [])
-    if experience_entries:
-        for exp in experience_entries:
-            st.markdown(f"**{exp.get('Role', 'N/A')}** at **{exp.get('Company', 'N/A')}**")
-            st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;*Duration:* {exp.get('Duration', 'N/A')}")
-            if exp.get("Description", "N/A") != "N/A":
-                st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;*Description:* {exp.get('Description', 'N/A')}")
-    else:
-        st.info("No professional experience details provided.")
-
-    st.markdown("---")
-    st.markdown("#### Projects")
-    project_entries = parsed_resume_data.get("Projects", [])
-    if project_entries and project_entries[0].get("Project_Name", "NA").upper() != "NA":
-        for proj in project_entries:
-            st.markdown(f"**Project Name:** {proj.get('Project_Name', 'N/A')}")
-            st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;*Description:* {proj.get('Project_Description', 'N/A')}")
-    else:
-        st.info("No project details provided.")
-
-    st.markdown("---")
-    st.markdown("#### Certifications")
-    certification_entries = parsed_resume_data.get("Certifications", [])
-    if certification_entries and certification_entries[0].get("Certification_Authority", "NA").upper() != "NA":
-        for cert in certification_entries:
-            st.markdown(f"**Certification:** {cert.get('Certification_Details', 'N/A')}")
-            st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;*Authority:* {cert.get('Certification_Authority', 'N/A')}")
-    else:
-        st.info("No certification details provided.")
-
-    st.markdown("---")
-    st.markdown("#### Technical Skills")
-    prog_lang = parsed_resume_data.get("Programming_Language", [])
-    if prog_lang:
-        st.write(f"**Programming Languages:** {', '.join(prog_lang)}")
-    else:
-        st.write("**Programming Languages:** N/A")
-
-    frameworks = parsed_resume_data.get("Frameworks", [])
-    if frameworks:
-        st.write(f"**Frameworks:** {', '.join(frameworks)}")
-    else:
-        st.write("**Frameworks:** N/A")
-
-    technologies = parsed_resume_data.get("Technologies", [])
-    if technologies:
-        st.write(f"**Technologies:** {', '.join(technologies)}")
-    else:
-        st.write("**Technologies:** N/A")
-
-
-def display_final_evaluation_results(evaluation_results: Dict[str, Any]):
-    """Display the final evaluation results summary"""
-    st.subheader("Final Resume Evaluation Results Summary")
-
-    # === Overall Scores ===
-    eval_summary = evaluation_results.get("Evaluation_Summary", {})
-    match_with_jd = eval_summary.get("Match_Percentage", "N/A").strip()
-    qualification_status = eval_summary.get("Qualification_Status", "N/A")
-    exp_score = eval_summary.get("Experience_Score", "N/A")
-    skills_score = eval_summary.get("Skills_Score", "N/A")
-    edu_score = eval_summary.get("Education_Score", "N/A")
-    projects_score = eval_summary.get("Projects_Score", "N/A")
-    overall_score = eval_summary.get("Overall_Weighted_Score", "N/A")
+    exp_score = eval_results.get("Experience_Score")
+    skill_score = eval_results.get("Skills_Score")
+    edu_score = eval_results.get("Education_Score")
+    projects_score = eval_results.get("Projects_Score")
+    overall_score = eval_results.get("Overall_Weighted_Score")
+    match_jd = eval_results.get("Match_Percentage")
+    qual_status = eval_results.get("Qualification Status")
 
     col_score1, col_score2, col_score3 = st.columns(3)
     with col_score1:
-        st.metric(label=" Overall Score (0-10)", value=overall_score)
+        st.metric(label="Overall Score (0-10)", value=overall_score)
     with col_score2:
-        st.metric(label=" Match with JD", value=match_with_jd)
+        st.metric(label="Match with JD", value=match_jd)
     with col_score3:
-        if qualification_status == "Qualified":
-            st.success(f" Status: {qualification_status}")
+        if qual_status == "Qualified":
+            st.success(f"Status: {qual_status}")
         else:
-            st.error(f" Status: {qualification_status}")
+            st.error(f"Status: {qual_status}")
 
-    # === Individual Scores ===
     st.markdown("---")
-    st.markdown("#### Detailed Scores")
+    st.subheader("📈 Detailed Scores")
 
-    col_ind_score1, col_ind_score2, col_ind_score3, col_ind_score4 = st.columns(4)  # Added a column for projects score
+    col_ind_score1, col_ind_score2, col_ind_score3, col_ind_score4 = st.columns(4)
     with col_ind_score1:
         st.metric(label="Experience Score (0-10)", value=exp_score)
     with col_ind_score2:
-        st.metric(label="Skills Score (0-10)", value=skills_score)
+        st.metric(label="Skills Score (0-10)", value=skill_score)
     with col_ind_score3:
         st.metric(label="Education Score (0-10)", value=edu_score)
     with col_ind_score4:
         st.metric(label="Projects Score (0-10)", value=projects_score)
 
-    # === Pros and Cons ===
     st.markdown("---")
-    st.markdown("#### Strengths and Areas for Improvement")
+    st.subheader("💪 Strengths and Areas for Improvement")
 
-    pros_and_cons = evaluation_results.get("Strengths_and_Weaknesses", {})
-    pros = pros_and_cons.get("Pros", [])
-    cons = pros_and_cons.get("Cons", [])
+    pros = eval_results.get("Pros")
+    cons = eval_results.get("Cons")
 
     col_pros, col_cons = st.columns(2)
+
     with col_pros:
-        st.success("##### Strengths")
+        st.success("##### ✅ Strengths")
         if pros:
             for p in pros:
-                st.write(f"- {p}")
+                st.markdown(f"- {p}")
         else:
             st.info("No specific strengths identified.")
 
     with col_cons:
-        st.warning("##### Weaknesses")
+        st.warning("##### ⚠️ Weaknesses")
         if cons:
             for c in cons:
-                st.write(f"- {c}")
+                st.markdown(f"- {c}")
         else:
             st.info("No specific weaknesses identified.")
 
-    # === Skills Match ===
+    # Skills Analysis
+    skills_match = eval_results.get("Skills Match")
+    if skills_match and len(skills_match) > 0:
+        st.markdown("---")
+        st.markdown("#### 🎯 Skills Matched with JD")
+        for skill_item in skills_match:
+            st.markdown(f"✓ {skill_item}")
+    else:
+        st.markdown("---")
+        st.info("No specific skills match details provided.")
+
+    # Missing Skills
+    missing_skills_from_resume = eval_results.get("Required_Skills_Missing_from_Resume")
+    if missing_skills_from_resume and len(missing_skills_from_resume) > 0:
+        st.markdown("---")
+        st.markdown("#### ❌ Required Skills Missing from Resume")
+        st.warning(", ".join(missing_skills_from_resume))
+    else:
+        st.markdown("---")
+        st.info("No required skills missing from resume identified.")
+
+    # Extra Skills
+    extra_skills = eval_results.get("Extra skills")
+    if extra_skills and len(extra_skills) > 0:
+        st.markdown("---")
+        st.markdown("#### ⭐ Extra Skills (Beyond JD Requirements)")
+        st.info(", ".join(extra_skills))
+    else:
+        st.markdown("---")
+        st.info("No extra skills identified.")
+
+    # Summary
+    summary_eval = eval_results.get("Summary")
+    if summary_eval:
+        st.markdown("---")
+        st.markdown("📝 **Summary**")
+        st.markdown(f"- {summary_eval}")
+
+    # PARSED RESUME DETAILS IN EXPANDABLE DROPDOWN
     st.markdown("---")
-    st.markdown("#### Skills Match Analysis")
+    st.subheader("📄 Parsed Resume Information")
 
-    skill_analysis = evaluation_results.get("Skill_Analysis", {})
-    skills_match = skill_analysis.get("Skills Match", [])
-    skills_not_matching = skill_analysis.get("Required_Skills_Missing_from_Resume", [])
-    extra_skills = skill_analysis.get("Extra skills", [])  # This alias is expected from the LLM JSON, so keep it.
+    if parsed_resume_data:
+        with st.expander("📋 View Full Parsed Resume Data", expanded=False):
 
-    if skills_match:
-        st.markdown("**Matching Skills:**")
-        st.info(",\n ".join(skills_match))
-    else:
-        st.warning("No direct skill matches found.")
+            st.write(f"**Name:** {candidate_name}")
 
-    if skills_not_matching:
-        st.markdown("**Missing Skills (from JD):**")
-        st.warning(",\n ".join(skills_not_matching))
+            contact_details = parsed_resume_data.get("Contact_Details", {})
+            st.markdown(f"**Mobile No:** {contact_details.get('Mobile_No', 'N/A')}")
+            st.markdown(f"**Email:** {contact_details.get('Email', 'N/A')}")
 
-    if extra_skills:
-        st.markdown("** Extra Skills (beyond JD):**")
-        st.info(",\n ".join(extra_skills))
-    else:
-        st.info("No additional skills beyond JD requirements identified.")
+            github_repo = parsed_resume_data.get("Github_Repo", "N/A")
+            if github_repo and github_repo.strip().lower() != "na":
+                st.markdown(f"**GitHub:** {github_repo}")
+            else:
+                st.markdown("**GitHub:** Not provided")
 
-    # === Key Considerations ===
+            linkedin = parsed_resume_data.get("LinkedIn", "N/A")
+            if linkedin and linkedin.strip().lower() != "na":
+                st.markdown(f"**LinkedIn:** {linkedin}")
+            else:
+                st.markdown("**LinkedIn:** Not provided")
+
+            st.markdown("---")
+            st.markdown("#### 🎓 Education")
+            education_entries = parsed_resume_data.get("Education", [])
+            if education_entries:
+                for edu in education_entries:
+                    st.markdown(f"**{edu.get('Degree', 'N/A')}** at {edu.get('Institution', 'N/A')}")
+                    score = edu.get("Score", "N/A")
+                    duration = edu.get("Duration", "N/A")
+                    st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;*Score:* {score}, *Duration:* {duration}")
+            else:
+                st.info("No education details provided.")
+
+            st.markdown("---")
+            st.markdown("#### 💼 Professional Experience")
+            experience_entries = parsed_resume_data.get("Professional_Experience", [])
+            if experience_entries:
+                for exp in experience_entries:
+                    st.markdown(f"**{exp.get('Role', 'N/A')}** at **{exp.get('Company', 'N/A')}**")
+                    st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;*Duration:* {exp.get('Duration', 'N/A')}")
+                    description = exp.get("Description", "N/A")
+                    if description and description.strip().lower() not in ["na", "n/a"]:
+                        st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;*Description:* {description}")
+            else:
+                st.info("No professional experience details provided.")
+
+            st.markdown("---")
+            st.markdown("#### 🚀 Projects")
+            project_entries = parsed_resume_data.get("Projects", [])
+            if project_entries and project_entries[0].get("Project_Name", "NA").upper() not in ["NA", "N/A"]:
+                for proj in project_entries:
+                    st.markdown(f"**Project Name:** {proj.get('Project_Name', 'N/A')}")
+                    description = proj.get("Project_Description", "N/A")
+                    if description and description.strip().lower() not in ["na", "n/a"]:
+                        st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;*Description:* {description}")
+            else:
+                st.info("No project details provided.")
+
+            st.markdown("---")
+            st.markdown("#### 🏆 Certifications")
+            certification_entries = parsed_resume_data.get("Certifications", [])
+            if certification_entries and len(certification_entries) > 0:
+                for cer in certification_entries:
+                    st.markdown(f"- {cer}")
+            else:
+                st.info("No certifications provided.")
+
+            st.markdown("---")
+            st.markdown("#### 💻 Technical Skills")
+            programming_languages = parsed_resume_data.get("Programming_Language", [])
+            frameworks = parsed_resume_data.get("Frameworks", [])
+            technologies = parsed_resume_data.get("Technologies", [])
+
+            all_skills = []
+            if programming_languages:
+                all_skills.append("##### Programming Languages")
+                all_skills.extend([f"⦿ {s}" for s in programming_languages])
+            if frameworks:
+                all_skills.append("##### Frameworks")
+                all_skills.extend([f"⦿ {s}" for s in frameworks])
+            if technologies:
+                all_skills.append("##### Technologies")
+                all_skills.extend([f"⦿ {s}" for s in technologies])
+
+            if all_skills:
+                for skill_item in all_skills:
+                    st.markdown(skill_item)
+            else:
+                st.info("No technical skills provided.")
+
+    # DECISION ACTIONS
     st.markdown("---")
-    st.markdown("####  Key Considerations")
+    st.subheader("🎯 Decision Actions")
 
-    key_considerations = evaluation_results.get("Key_Considerations", {})
-    kpis = key_considerations.get("Quantifiable_Achievements_Identified", [])
-    red_flags = key_considerations.get("Red_Flags_Noted", [])
-    overall_recommendation = key_considerations.get("Overall_Recommendation", "N/A")
+    combine_eval_results = eval_results
+    combine_eval_results["name"] = candidate_name
 
-    if kpis:
-        st.markdown("** Quantifiable Achievements:**")
-        for kpi in kpis:
-            st.markdown(f"- {kpi}")
-    else:
-        st.info("No quantifiable achievements noted.")
-
-    if red_flags:
-        st.markdown("** Red Flags:**")
-        for flag in red_flags:
-            st.warning(f"- {flag}")
-    else:
-        st.success("No red flags identified.")
-
-    if overall_recommendation and overall_recommendation != "N/A":
-        st.markdown("** Final Recommendation:**")
-        st.markdown(f"- {overall_recommendation}")
-
-
-# --- Streamlit Frontend (main app structure) ---
-st.set_page_config(layout="wide", page_title="Resume Analyzer")
-
-st.title("Resume Analyzer and Evaluator")
-
-# Initialize session state variables
-if "uploaded_resume_filename" not in st.session_state:
-    st.session_state.uploaded_resume_filename = None
-if "parsed_resume" not in st.session_state:
-    st.session_state.parsed_resume = None
-if "personal_details" not in st.session_state:
-    st.session_state.personal_details = None
-if "evaluation_results" not in st.session_state:
-    st.session_state.evaluation_results = None
-if "show_jd_sections" not in st.session_state:
-    st.session_state.show_jd_sections = False
-if "decision_made" not in st.session_state:
-    st.session_state.decision_made = None
-if "temp_jd_path" not in st.session_state:
-    st.session_state.temp_jd_path = None
-
-
-# --- Section 1: Upload and Parse Resume ---
-st.header("1. Upload and Parse Resume")
-uploaded_file = st.file_uploader("Choose a resume file (PDF)", type=["pdf"])
-
-# Placeholder for messages during upload/parsing
-parsing_status_messages = st.empty()
-
-if uploaded_file is not None:
-    if st.button("Process Resume", key="process_resume_btn"):
-        # Clear states of previous sessions when a new resume is processed
-        st.session_state.uploaded_resume_filename = None
-        st.session_state.parsed_resume = None
-        st.session_state.evaluation_results = None
-        st.session_state.show_jd_sections = False
-        st.session_state.decision_made = None
-        st.session_state.temp_jd_path = None
-
-        with st.spinner("Uploading resume..."):
-            uploaded_filename = upload_resume_file_to_backend(uploaded_file, parsing_status_messages)
-            st.session_state.uploaded_resume_filename = uploaded_filename
-
-        if st.session_state.uploaded_resume_filename:
-            with st.spinner("Parsing resume with LLM..."):
-                parsed_data = parse_resume_from_backend(st.session_state.uploaded_resume_filename, parsing_status_messages)
-                st.session_state.parsed_resume = parsed_data
-
-                if st.session_state.parsed_resume:
-                    st.session_state.show_jd_sections = True
-                    parsing_status_messages.success("Resume processed and parsed successfully!")
-                else:
-                    st.session_state.show_jd_sections = False
-                    parsing_status_messages.error("Failed to parse resume after upload.")
-        else:
-            parsing_status_messages.error("Resume upload failed. Cannot proceed with parsing.")
-
-
-# --- Collapsible Parsed Resume Section ---
-if st.session_state.parsed_resume:
-    with st.expander("View Parsed Resume Information (Click to Expand)"):
-        display_parsed_resume_in_markdown(st.session_state.parsed_resume)
-    st.markdown("---")
-
-
-# --- Section 2 & 3: Conditional Display ---
-if st.session_state.show_jd_sections:
-    # --- Section 2: Provide Job Description ---
-    st.header("2. Provide Job Description")
-
-    st.info("Please paste a JD or select one from the dropdown to proceed.")
-
-    custom_jd_text = st.text_area(
-        "Paste a Job Description here ( Press Cmd+Enter to submit )",
-        height=80,
-        help="Paste the full job description. If text is entered here, it will be used instead of the dropdown selection.",
-    )
-
-    # Create a dropdown for JD options
-    selected_jd_display = st.selectbox("Or Select a Job Description:", options=list(JD_OPTIONS.keys()), index=0)
-
-    # Determine the JD path to send to the backend
-    jd_content = None
-    if custom_jd_text and len(custom_jd_text.strip()) > 50:
-
-        jd_content = {"job_description": custom_jd_text}
-
-        st.info("Using custom JD from text.")
-
-    elif selected_jd_display != "Select a pre-existing JD":
-        # For pre-existing JDs, pass the filename. Backend will resolve it from its JD_UPLOAD_FOLDER.
-        jd_path_to_use = JD_OPTIONS[selected_jd_display]
-        jd_content = json.load(open(jd_path_to_use))
-        st.info(f"Selected pre-existing JD: `{jd_path_to_use}`")
-
-    # Placeholder for messages during evaluation
-    evaluation_status_messages = st.empty()
-
-    if st.session_state.parsed_resume is not None and jd_content:
-        if st.button("Evaluate Resume", key="evaluate_resume_btn"):
-            # Clear previous decision when re-evaluating
-
-            # --- Section 3: Evaluate Resume against JD ---
-            st.header("3. Evaluate Resume against JD")
-
-            st.session_state.decision_made = None
-
-            with st.spinner("Evaluating..."):
-                # Store personal details separately for the report page.
-                personal_details_keys = ["Name", "Contact_Details", "Github_Repo", "LinkedIn"]
-                st.session_state.personal_details = {key: st.session_state.parsed_resume.get(key) for key in personal_details_keys}
-
-                st.session_state.evaluation_results = evaluate_resume_with_backend(
-                    st.session_state.parsed_resume,
-                    jd_content,
-                    evaluation_status_messages,
-                )
-
-                if st.session_state.evaluation_results:
-                    evaluation_status_messages.success("Resume evaluation complete!")
-                else:
-                    evaluation_status_messages.error("Resume evaluation failed. Check backend logs for details.")
-
-    elif st.session_state.parsed_resume is None:
-        evaluation_status_messages.warning("Please upload and parse a resume first to proceed with evaluation.")
-    else:
-        evaluation_status_messages.info("Select a Job Description and click 'Evaluate Resume'.")
-
-
-# --- Display Final Evaluation Results (Outside of button logic) ---
-if st.session_state.evaluation_results:
-    display_final_evaluation_results(st.session_state.evaluation_results)
-
-    # Accept/Reject buttons
-    candidate_name = (st.session_state.personal_details.get("Name") if st.session_state.personal_details else None) or st.session_state.parsed_resume.get("Name", "Unknown")
-
-    # Display decision status if already made
     if st.session_state.decision_made:
         if st.session_state.decision_made == "Accept":
-            st.success(f" **{candidate_name}** has been marked as **Accepted**!")
+            st.success(f"✅ **{candidate_name}** has been marked as **Accepted**!")
         else:
-            st.warning(f" **{candidate_name}** has been marked as **Rejected**!")
-    else:
-        # Shown when no decision made yet
-        col1, col2, col3 = st.columns([1, 1, 2])
+            st.warning(f"❌ **{candidate_name}** has been marked as **Rejected**!")
 
+    else:
+        col1, col2, col3 = st.columns([1, 1, 2])
         with col1:
             if st.button("✅ Accept", key="accept_btn"):
-                response = requests.post(f"{BACKEND_URL}/store_decision", params={"name": candidate_name, "decision": "Accept"})
+                response = requests.post(f"{BACKEND_URL}/store_candidate_evaluation", json=combine_eval_results)
                 if response.status_code == 200:
                     st.session_state.decision_made = "Accept"
                     st.rerun()
@@ -374,7 +525,7 @@ if st.session_state.evaluation_results:
 
         with col2:
             if st.button("❌ Reject", key="reject_btn"):
-                response = requests.post(f"{BACKEND_URL}/store_decision", params={"name": candidate_name, "decision": "Reject"})
+                response = requests.post(f"{BACKEND_URL}/store_candidate_evaluation", json=combine_eval_results)
                 if response.status_code == 200:
                     st.session_state.decision_made = "Reject"
                     st.rerun()
@@ -382,16 +533,8 @@ if st.session_state.evaluation_results:
                     st.error(f"Failed to store decision: {response.text}")
 
         with col3:
-            # Generate Report Button
-            if st.button("Generate Report", key="generate_report_btn"):
-                # Store data in session state for the report page
-                st.session_state.report_evaluation_results = st.session_state.evaluation_results
-                st.session_state.report_parsed_resume = st.session_state.parsed_resume
-                # Ensure personal_details is set before navigating
-                personal_details_keys = ["Name", "Contact_Details", "Github_Repo", "LinkedIn"]
-                st.session_state.report_personal_details = {key: st.session_state.parsed_resume.get(key) for key in personal_details_keys}
-                # Navigate to the report page - ensure 'pages/report_page.py'
+            if st.button("📊 Generate Report", key="generate_report_btn"):
+                st.session_state.report_evaluation_results = eval_results
+                st.session_state.report_parsed_resume = parsed_resume_data
+                st.session_state.report_cand_name = candidate_name
                 st.switch_page("pages/report_page.py")
-
-else:
-    st.info("Upload and parse a resume above to unlock Job Description and Evaluation sections.")
