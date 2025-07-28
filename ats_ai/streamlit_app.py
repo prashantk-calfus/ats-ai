@@ -1,5 +1,6 @@
 import json
 import os
+from pathlib import Path
 
 import pymupdf
 import requests
@@ -51,6 +52,7 @@ else:
 
 # JD Selection Section with Tabs
 st.header("Job Description")
+
 tab1, tab2 = st.tabs(["📋 Select Existing JD", "💾 Add New JD"])
 
 jd_content = None

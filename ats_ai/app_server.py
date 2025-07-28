@@ -180,6 +180,24 @@ async def save_jd_raw_text(request: JDTextRequest):
         raise HTTPException(status_code=500, detail=f"Error saving JD: {str(e)}")
 
 
+@app.post("/process_jd_folder", status_code=status.HTTP_200_OK)
+async def process_jd_folder():
+    """Process all DOC/DOCX files in jd_folder and convert to JSON"""
+    try:
+        from ats_ai.agent.jd_parser import process_jd_folder_to_json
+
+        processed_count = process_jd_folder_to_json()
+
+        return {
+            "status": "success",
+            "message": f"Processed {processed_count} JD files successfully",
+            "processed_count": processed_count
+        }
+
+    except Exception as e:
+        logger.error(f"Error in process_jd_folder: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error processing JD folder: {str(e)}")
+
 
 @app.get("/")
 async def docs():

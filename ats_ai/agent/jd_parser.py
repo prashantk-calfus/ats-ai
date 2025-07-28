@@ -1,11 +1,15 @@
 import json
 import logging
 import os
+from pathlib import Path
+
 from langchain_community.document_loaders import PyMuPDFLoader
 from langchain_community.llms import Ollama
 from ats_ai.agent.llm_agent import extract_json_block
 from ats_ai.agent.prompts import JD_EXTRACTION_PROMPT
 from ats_ai.agent.prompts import JD_VALIDATION_AND_EXTRACTION_PROMPT
+
+import mammoth
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +82,106 @@ def save_json(data: dict, output_path: str):
         json.dump(data, f, indent=2)
     print(f"Structured JD saved to: {output_path}")
 
+
+def load_docx_text(file_path: str) -> str:
+    """Load text from DOCX file"""
+    try:
+        with open(file_path, "rb") as docx_file:
+            result = mammoth.extract_raw_text(docx_file)
+            return result.value
+    except Exception as e:
+        logger.error(f"Error reading DOCX file {file_path}: {e}")
+        return ""
+
+#
+# def load_doc_text(file_path: str) -> str:
+#     """Load text from DOC file (fallback to python-docx)"""
+#     try:
+#         from docx import Document
+#         doc = Document(file_path)
+#         text = []
+#         for paragraph in doc.paragraphs:
+#             text.append(paragraph.text)
+#         return '\n'.join(text)
+#     except Exception as e:
+#         logger.error(f"Error reading DOC file {file_path}: {e}")
+#         return ""
+
+
+def load_document_text(file_path: str) -> str:
+    """Universal document loader for PDF, DOC, DOCX"""
+    file_extension = Path(file_path).suffix.lower()
+
+    # if file_extension == '.pdf':
+    #     return load_pdf_text(file_path)
+    if file_extension == '.docx':
+        return load_docx_text(file_path)
+    # elif file_extension == '.doc':
+    #     return load_doc_text(file_path)
+    else:
+        raise ValueError(f"Unsupported file format: {file_extension}")
+
+
+def process_jd_folder_to_json():
+    """
+    NEW FUNCTION: Process all DOC/DOCX files in jd_folder and convert to JSON
+    """
+    jd_folder = Path("jd_folder")
+    jd_json_folder = Path("jd_json")
+
+    # Create jd_json folder if it doesn't exist
+    jd_json_folder.mkdir(exist_ok=True)
+
+    if not jd_folder.exists():
+        logger.warning("jd_folder does not exist")
+        return
+
+    # Process all DOC/DOCX files
+    supported_extensions = ['.doc', '.docx', '.pdf']
+    processed_count = 0
+
+    for file_path in jd_folder.iterdir():
+        if file_path.suffix.lower() in supported_extensions:
+            try:
+                logger.info(f"Processing: {file_path.name}")
+
+                # Load document text
+                jd_text = load_document_text(str(file_path))
+
+                if not jd_text.strip():
+                    logger.warning(f"No text extracted from {file_path.name}")
+                    continue
+
+                # Extract JD info using LLM
+                jd_structured = extract_jd_info(jd_text)
+
+                # Check if it's a valid JD
+                is_valid_jd = bool(
+                    jd_structured.get("Job_Title", "").strip() or
+                    jd_structured.get("Required_Skills", []) or
+                    jd_structured.get("Responsibilities", [])
+                )
+
+                if is_valid_jd:
+                    # Create JSON filename
+                    json_filename = file_path.stem + ".json"
+                    json_path = jd_json_folder / json_filename
+
+                    # Save JSON
+                    with open(json_path, "w", encoding='utf-8') as f:
+                        json.dump(jd_structured, f, indent=2, ensure_ascii=False)
+
+                    logger.info(f"✅ Saved: {json_filename}")
+                    processed_count += 1
+                else:
+                    logger.warning(f"❌ Invalid JD: {file_path.name}")
+
+            except Exception as e:
+                logger.error(f"Error processing {file_path.name}: {e}")
+                continue
+
+    logger.info(f"Processed {processed_count} JD files successfully")
+    return processed_count
 
 
 if __name__ == "__main__":
