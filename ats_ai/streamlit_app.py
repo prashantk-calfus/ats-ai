@@ -1,15 +1,16 @@
 import json
 import os
+import time
 from pathlib import Path
+
 import pymupdf
 import requests
 import streamlit as st
 from dotenv import load_dotenv
-import time
 
 load_dotenv()
 
-BACKEND_URL = "http://localhost:8000"
+BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
 
 st.set_page_config(layout="wide", page_title="ATS AI")
 st.title("ATS AI : Intelligent Resume Screening")
@@ -76,16 +77,11 @@ with tab1:
             existing_jds_response = response.json()
             existing_jds = existing_jds_response.get("jds", [])
             jd_options = ["Select a pre-existing JD"] + existing_jds
-            selected_jd_display = st.selectbox(
-                "Choose a Job Description:",
-                options=jd_options,
-                index=0,
-                key="jd_dropdown"
-            )
+            selected_jd_display = st.selectbox("Choose a Job Description:", options=jd_options, index=0, key="jd_dropdown")
 
             if selected_jd_display != "Select a pre-existing JD":
                 # NEW: Check if JD selection has changed
-                if st.session_state.get('current_selected_jd') != selected_jd_display:
+                if st.session_state.get("current_selected_jd") != selected_jd_display:
                     st.session_state.current_selected_jd = selected_jd_display
                     # Reset evaluation state when JD changes
                     st.session_state.parsed_data_combined = None
@@ -99,7 +95,7 @@ with tab1:
                     jd_filename = f"{selected_jd_display}.json"
                     jd_path = os.path.join("jd_json", jd_filename)
                     if os.path.exists(jd_path):
-                        with open(jd_path, 'r') as f:
+                        with open(jd_path, "r") as f:
                             jd_content = json.load(f)
                         jd_source = f"Selected JD: {selected_jd_display}"
                         st.success(f"✅ Using selected JD: **{selected_jd_display}**")
@@ -109,7 +105,7 @@ with tab1:
                     st.error(f"Error loading selected JD: {str(e)}")
             else:
                 # Reset when no JD is selected
-                if st.session_state.get('current_selected_jd') is not None:
+                if st.session_state.get("current_selected_jd") is not None:
                     st.session_state.current_selected_jd = None
                     st.session_state.parsed_data_combined = None
                     st.session_state.decision_made = None
@@ -130,25 +126,13 @@ with tab2:
 
     col1, col2 = st.columns([1, 2])
     with col1:
-        jd_name_input = st.text_input(
-            "JD Name:",
-            placeholder="e.g., Senior Python Developer",
-            key="jd_name_input_field",
-            value="" if st.session_state.clear_jd_form else st.session_state.jd_name_input
-        )
+        jd_name_input = st.text_input("JD Name:", placeholder="e.g., Senior Python Developer", key="jd_name_input_field", value="" if st.session_state.clear_jd_form else st.session_state.jd_name_input)
 
     with col2:
-        jd_text_input = st.text_area(
-            "JD Text:",
-            height=150,
-            placeholder="Paste the job description text here...",
-            key="jd_text_input_field",
-            value="" if st.session_state.clear_jd_form else st.session_state.jd_text_input
-        )
+        jd_text_input = st.text_area("JD Text:", height=150, placeholder="Paste the job description text here...", key="jd_text_input_field", value="" if st.session_state.clear_jd_form else st.session_state.jd_text_input)
 
     # NEW: Check if JD text input has changed
-    if (jd_text_input != st.session_state.current_jd_text or
-            jd_name_input != st.session_state.current_jd_name):
+    if jd_text_input != st.session_state.current_jd_text or jd_name_input != st.session_state.current_jd_name:
         st.session_state.current_jd_text = jd_text_input
         st.session_state.current_jd_name = jd_name_input
         # Reset evaluation state when JD text changes
@@ -173,18 +157,12 @@ with tab2:
                 with st.spinner("🤖 Analyzing JD with AI intelligence..."):
                     try:
                         # Use the enhanced endpoint
-                        save_response = requests.post(
-                            f"{BACKEND_URL}/save_jd_raw_text/",
-                            json={
-                                "jd_name": jd_name_input,
-                                "jd_text": jd_text_input
-                            }
-                        )
+                        save_response = requests.post(f"{BACKEND_URL}/save_jd_raw_text/", json={"jd_name": jd_name_input, "jd_text": jd_text_input})
 
                         if save_response.status_code == 200:
                             response_data = save_response.json()
-                            is_valid_jd = response_data.get('is_valid_jd', True)
-                            validation_method = response_data.get('validation_method', 'AI analysis')
+                            is_valid_jd = response_data.get("is_valid_jd", True)
+                            validation_method = response_data.get("validation_method", "AI analysis")
 
                             if is_valid_jd:
                                 st.success(f"✅ JD '{jd_name_input}' saved successfully!")
@@ -198,12 +176,11 @@ with tab2:
                                 # Auto-clear the error message after 2 minutes (120 seconds)
                                 import threading
 
-
                                 def clear_error():
                                     import time
+
                                     time.sleep(120)  # 2 minutes
                                     error_placeholder.empty()
-
 
                                 threading.Thread(target=clear_error, daemon=True).start()
 
@@ -217,7 +194,7 @@ with tab2:
                                 st.rerun()
 
                         else:
-                            error_detail = save_response.json().get('detail', save_response.text)
+                            error_detail = save_response.json().get("detail", save_response.text)
                             st.error(f"❌ Failed to save JD: {error_detail}")
 
                     except requests.exceptions.ConnectionError:
@@ -231,7 +208,7 @@ with tab2:
             else:
                 st.warning("📝 Please provide both JD name and JD text")
 
-    if st.session_state.get('show_nav_message', False) and st.session_state.get('nav_message_time'):
+    if st.session_state.get("show_nav_message", False) and st.session_state.get("nav_message_time"):
         import time
 
         elapsed_time = time.time() - st.session_state.nav_message_time
@@ -242,18 +219,14 @@ with tab2:
             st.session_state.nav_message_time = None
 
 # Determine JD content for evaluation
-if 'selected_jd_display' in locals() and selected_jd_display != "Select a pre-existing JD":
+if "selected_jd_display" in locals() and selected_jd_display != "Select a pre-existing JD":
     # Using selected JD
     pass
 elif jd_text_input:
     # Using text input JD - parse it for evaluation
     if not jd_content:
         try:
-            parse_response = requests.post(
-                f"{BACKEND_URL}/save_jd_raw_text",
-                data=jd_text_input.encode('utf-8'),
-                headers={"Content-Type": "text/plain"}
-            )
+            parse_response = requests.post(f"{BACKEND_URL}/save_jd_raw_text", data=jd_text_input.encode("utf-8"), headers={"Content-Type": "text/plain"})
             if parse_response.status_code == 200:
                 response_data = parse_response.json()
                 jd_content = response_data.get("parsed_data")
@@ -295,8 +268,7 @@ if st.session_state.uploaded_resume_name and (jd_content or jd_text_input):
                     upload_response = requests.post(f"{BACKEND_URL}/upload_resume_file", files=files)
 
                     if upload_response.status_code != 200:
-                        st.error(
-                            f"Failed to upload resume to backend: {upload_response.status_code} - {upload_response.text}")
+                        st.error(f"Failed to upload resume to backend: {upload_response.status_code} - {upload_response.text}")
                         st.session_state.parsed_data_combined = None
                         st.session_state.decision_made = None
                     else:
@@ -304,11 +276,7 @@ if st.session_state.uploaded_resume_name and (jd_content or jd_text_input):
                         final_jd_content = jd_content
                         if not final_jd_content and jd_text_input:
                             # Parse JD text
-                            parse_response = requests.post(
-                                f"{BACKEND_URL}/save_jd_raw_text",
-                                data=jd_text_input.encode('utf-8'),
-                                headers={"Content-Type": "text/plain"}
-                            )
+                            parse_response = requests.post(f"{BACKEND_URL}/save_jd_raw_text", data=jd_text_input.encode("utf-8"), headers={"Content-Type": "text/plain"})
                             if parse_response.status_code == 200:
                                 response_data = parse_response.json()
                                 final_jd_content = response_data.get("parsed_data")
@@ -571,4 +539,3 @@ if st.session_state.parsed_data_combined:
                 st.session_state.report_parsed_resume = parsed_resume_data
                 st.session_state.report_cand_name = candidate_name
                 st.switch_page("pages/report_page.py")
-
