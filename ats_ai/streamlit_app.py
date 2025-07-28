@@ -14,6 +14,7 @@ BACKEND_URL = "http://localhost:8000"
 st.set_page_config(layout="wide", page_title="ATS AI")
 st.title("ATS AI : Intelligent Resume Screening")
 
+# Initialize all session state variables
 if "parsed_data_combined" not in st.session_state:
     st.session_state.parsed_data_combined = None
 if "decision_made" not in st.session_state:
@@ -35,6 +36,14 @@ if "jd_name_input" not in st.session_state:
     st.session_state.jd_name_input = ""
 if "clear_jd_form" not in st.session_state:
     st.session_state.clear_jd_form = False
+
+# NEW: Initialize JD change tracking variables
+if "current_selected_jd" not in st.session_state:
+    st.session_state.current_selected_jd = None
+if "current_jd_text" not in st.session_state:
+    st.session_state.current_jd_text = ""
+if "current_jd_name" not in st.session_state:
+    st.session_state.current_jd_name = ""
 
 uploaded_resume = st.file_uploader("Upload resume file (PDF)", type=["pdf"])
 
@@ -75,6 +84,16 @@ with tab1:
             )
 
             if selected_jd_display != "Select a pre-existing JD":
+                # NEW: Check if JD selection has changed
+                if st.session_state.get('current_selected_jd') != selected_jd_display:
+                    st.session_state.current_selected_jd = selected_jd_display
+                    # Reset evaluation state when JD changes
+                    st.session_state.parsed_data_combined = None
+                    st.session_state.decision_made = None
+                    st.session_state.report_evaluation_results = None
+                    st.session_state.report_parsed_resume = None
+                    st.session_state.report_cand_name = None
+
                 # Load the selected JD file
                 try:
                     jd_filename = f"{selected_jd_display}.json"
@@ -88,6 +107,15 @@ with tab1:
                         st.warning(f"JD file not found locally: {jd_filename}")
                 except Exception as e:
                     st.error(f"Error loading selected JD: {str(e)}")
+            else:
+                # Reset when no JD is selected
+                if st.session_state.get('current_selected_jd') is not None:
+                    st.session_state.current_selected_jd = None
+                    st.session_state.parsed_data_combined = None
+                    st.session_state.decision_made = None
+                    st.session_state.report_evaluation_results = None
+                    st.session_state.report_parsed_resume = None
+                    st.session_state.report_cand_name = None
         else:
             st.error("Failed to load existing JDs from backend")
             existing_jds = []
@@ -117,12 +145,25 @@ with tab2:
             key="jd_text_input_field",
             value="" if st.session_state.clear_jd_form else st.session_state.jd_text_input
         )
-    #
+
+    # NEW: Check if JD text input has changed
+    if (jd_text_input != st.session_state.current_jd_text or
+            jd_name_input != st.session_state.current_jd_name):
+        st.session_state.current_jd_text = jd_text_input
+        st.session_state.current_jd_name = jd_name_input
+        # Reset evaluation state when JD text changes
+        if jd_text_input and jd_name_input:  # Only reset if both fields have content
+            st.session_state.parsed_data_combined = None
+            st.session_state.decision_made = None
+            st.session_state.report_evaluation_results = None
+            st.session_state.report_parsed_resume = None
+            st.session_state.report_cand_name = None
+            # Also reset selected JD to avoid conflicts
+            st.session_state.current_selected_jd = None
+
     # Reset the clear trigger
     if st.session_state.clear_jd_form:
         st.session_state.clear_jd_form = False
-
-
 
     col_save, col_use = st.columns([1, 1])
 
@@ -157,10 +198,12 @@ with tab2:
                                 # Auto-clear the error message after 2 minutes (120 seconds)
                                 import threading
 
+
                                 def clear_error():
                                     import time
                                     time.sleep(120)  # 2 minutes
                                     error_placeholder.empty()
+
 
                                 threading.Thread(target=clear_error, daemon=True).start()
 
@@ -207,7 +250,6 @@ elif jd_text_input:
     if not jd_content:
         try:
             parse_response = requests.post(
-                # f"{BACKEND_URL}/save_jd",
                 f"{BACKEND_URL}/save_jd_raw_text",
                 data=jd_text_input.encode('utf-8'),
                 headers={"Content-Type": "text/plain"}
@@ -219,60 +261,75 @@ elif jd_text_input:
         except:
             pass
 
-# Single Evaluation Button
+# UPDATED: Single Evaluation Button with improved logic
 if st.session_state.uploaded_resume_name and (jd_content or jd_text_input):
-    evaluate_button_disabled = st.session_state.parsed_data_combined is not None
-    if st.button("🚀 Upload & Evaluate", disabled=evaluate_button_disabled):
-        with st.spinner("Processing resume and evaluating..."):
-            try:
-                # Read resume text
-                resume_pdf_reader = pymupdf.open(stream=uploaded_resume.getvalue(), filetype="pdf")
-                resume_text = ""
-                for i in range(resume_pdf_reader.page_count):
-                    page = resume_pdf_reader.load_page(i)
-                    resume_text += page.get_text()
+    # Always enable the button for re-evaluation
+    evaluate_button_disabled = False
 
-                # Upload resume file
-                files = {"resume_file": (uploaded_resume.name, uploaded_resume.getvalue(), uploaded_resume.type)}
-                upload_response = requests.post(f"{BACKEND_URL}/upload_resume_file", files=files)
+    # Show re-evaluation message if already evaluated
+    if st.session_state.parsed_data_combined is not None:
+        st.info("🔄 Click to re-evaluate with the current JD selection")
 
-                if upload_response.status_code != 200:
-                    st.error(
-                        f"Failed to upload resume to backend: {upload_response.status_code} - {upload_response.text}")
+    col_eval, col_clear = st.columns([2, 1])
+
+    with col_eval:
+        if st.button("🚀 Evaluate", disabled=evaluate_button_disabled):
+            # Reset previous results before new evaluation
+            st.session_state.parsed_data_combined = None
+            st.session_state.decision_made = None
+            st.session_state.report_evaluation_results = None
+            st.session_state.report_parsed_resume = None
+            st.session_state.report_cand_name = None
+
+            with st.spinner("Processing resume and evaluating..."):
+                try:
+                    # Read resume text
+                    resume_pdf_reader = pymupdf.open(stream=uploaded_resume.getvalue(), filetype="pdf")
+                    resume_text = ""
+                    for i in range(resume_pdf_reader.page_count):
+                        page = resume_pdf_reader.load_page(i)
+                        resume_text += page.get_text()
+
+                    # Upload resume file
+                    files = {"resume_file": (uploaded_resume.name, uploaded_resume.getvalue(), uploaded_resume.type)}
+                    upload_response = requests.post(f"{BACKEND_URL}/upload_resume_file", files=files)
+
+                    if upload_response.status_code != 200:
+                        st.error(
+                            f"Failed to upload resume to backend: {upload_response.status_code} - {upload_response.text}")
+                        st.session_state.parsed_data_combined = None
+                        st.session_state.decision_made = None
+                    else:
+                        # Use existing JD or parse text JD
+                        final_jd_content = jd_content
+                        if not final_jd_content and jd_text_input:
+                            # Parse JD text
+                            parse_response = requests.post(
+                                f"{BACKEND_URL}/save_jd_raw_text",
+                                data=jd_text_input.encode('utf-8'),
+                                headers={"Content-Type": "text/plain"}
+                            )
+                            if parse_response.status_code == 200:
+                                response_data = parse_response.json()
+                                final_jd_content = response_data.get("parsed_data")
+
+                        if final_jd_content:
+                            combined_json = {"resume_data": resume_text, "jd_json": final_jd_content}
+                            response = requests.post(f"{BACKEND_URL}/parse_and_evaluate", json=combined_json)
+
+                            if response.status_code == 200:
+                                st.session_state.parsed_data_combined = response.json()
+                                st.success("✅ Evaluation Complete!")
+                            else:
+                                st.error(f"Evaluation failed: {response.status_code} - {response.text}")
+                                st.session_state.parsed_data_combined = None
+                                st.session_state.decision_made = None
+                        else:
+                            st.error("Failed to process Job Description")
+                except Exception as e:
+                    st.error(f"An error occurred during evaluation: {e}")
                     st.session_state.parsed_data_combined = None
                     st.session_state.decision_made = None
-                else:
-                    # Use existing JD or parse text JD
-                    final_jd_content = jd_content
-                    if not final_jd_content and jd_text_input:
-                        # Parse JD text
-                        parse_response = requests.post(
-                            # f"{BACKEND_URL}/save_jd",
-                            f"{BACKEND_URL}/save_jd_raw_text",
-                            data=jd_text_input.encode('utf-8'),
-                            headers={"Content-Type": "text/plain"}
-                        )
-                        if parse_response.status_code == 200:
-                            response_data = parse_response.json()
-                            final_jd_content = response_data.get("parsed_data")
-
-                    if final_jd_content:
-                        combined_json = {"resume_data": resume_text, "jd_json": final_jd_content}
-                        response = requests.post(f"{BACKEND_URL}/parse_and_evaluate", json=combined_json)
-
-                        if response.status_code == 200:
-                            st.session_state.parsed_data_combined = response.json()
-                            st.success("✅ Evaluation Complete!")
-                        else:
-                            st.error(f"Evaluation failed: {response.status_code} - {response.text}")
-                            st.session_state.parsed_data_combined = None
-                            st.session_state.decision_made = None
-                    else:
-                        st.error("Failed to process Job Description")
-            except Exception as e:
-                st.error(f"An error occurred during evaluation: {e}")
-                st.session_state.parsed_data_combined = None
-                st.session_state.decision_made = None
 
 
 # Display Results - SCOREBOARD FIRST, then parsed resume details
@@ -514,3 +571,4 @@ if st.session_state.parsed_data_combined:
                 st.session_state.report_parsed_resume = parsed_resume_data
                 st.session_state.report_cand_name = candidate_name
                 st.switch_page("pages/report_page.py")
+

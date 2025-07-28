@@ -2,8 +2,11 @@ import os
 import re
 import json
 import shutil
+from pathlib import Path
 from typing import Any, Dict
 import logging
+
+import fitz
 from fastapi import FastAPI, File, UploadFile, HTTPException, Request
 from pydantic import BaseModel
 from starlette import status
@@ -197,6 +200,7 @@ async def process_jd_folder():
     except Exception as e:
         logger.error(f"Error in process_jd_folder: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error processing JD folder: {str(e)}")
+
 
 
 @app.get("/")

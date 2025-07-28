@@ -93,31 +93,15 @@ def load_docx_text(file_path: str) -> str:
         logger.error(f"Error reading DOCX file {file_path}: {e}")
         return ""
 
-#
-# def load_doc_text(file_path: str) -> str:
-#     """Load text from DOC file (fallback to python-docx)"""
-#     try:
-#         from docx import Document
-#         doc = Document(file_path)
-#         text = []
-#         for paragraph in doc.paragraphs:
-#             text.append(paragraph.text)
-#         return '\n'.join(text)
-#     except Exception as e:
-#         logger.error(f"Error reading DOC file {file_path}: {e}")
-#         return ""
-
 
 def load_document_text(file_path: str) -> str:
     """Universal document loader for PDF, DOC, DOCX"""
     file_extension = Path(file_path).suffix.lower()
 
-    # if file_extension == '.pdf':
-    #     return load_pdf_text(file_path)
+
     if file_extension == '.docx':
         return load_docx_text(file_path)
-    # elif file_extension == '.doc':
-    #     return load_doc_text(file_path)
+
     else:
         raise ValueError(f"Unsupported file format: {file_extension}")
 
