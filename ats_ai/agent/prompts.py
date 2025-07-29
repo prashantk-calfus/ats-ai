@@ -448,33 +448,7 @@ If the text passes validation, extract the following structured information:
 **TEXT TO ANALYZE**:
 {{JD_TEXT}}
 
-**REQUIRED JSON OUTPUT FORMAT**:
 
-If NOT a valid job description:
-{
-    "is_valid_jd": false,
-    "Job_Title": "",
-    "Required_Skills": [],
-    "Preferred_Skills": [],
-    "Minimum_Experience": "",
-    "Location": "",
-    "Responsibilities": [],
-    "Qualifications": [],
-    "Domain": ""
-}
-
-If IS a valid job description:
-{
-    "is_valid_jd": true,
-    "Job_Title": "extracted job title",
-    "Required_Skills": ["skill1", "skill2", "skill3"],
-    "Preferred_Skills": ["skill1", "skill2"],
-    "Minimum_Experience": "X years" or "Entry level" or "Senior level",
-    "Location": "specific location or Remote/Hybrid",
-    "Responsibilities": ["responsibility1", "responsibility2", "responsibility3"],
-    "Qualifications": ["qualification1", "qualification2"],
-    "Domain": "industry/domain (e.g., Technology, Healthcare, Finance)"
-}
 
 **EXTRACTION GUIDELINES**:
 - Be thorough but precise in your extraction
