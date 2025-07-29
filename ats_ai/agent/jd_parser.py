@@ -3,30 +3,19 @@ import logging
 import os
 from pathlib import Path
 
+import mammoth
 from langchain_community.document_loaders import PyMuPDFLoader
 from langchain_community.llms import Ollama
+
 from ats_ai.agent.llm_agent import extract_json_block
 from ats_ai.agent.prompts import JD_EXTRACTION_PROMPT
-from ats_ai.agent.prompts import JD_VALIDATION_AND_EXTRACTION_PROMPT
-
-import mammoth
 
 logger = logging.getLogger(__name__)
 
+
 def create_empty_jd_structure() -> dict:
     """Create an empty JD structure for invalid inputs"""
-    return {
-        "is_valid_jd": False,
-        "Job_Title": "",
-        "Required_Skills": [],
-        "Preferred_Skills": [],
-        "Minimum_Experience": "",
-        "Location": "",
-        "Responsibilities": [],
-        "Qualifications": [],
-        "Domain": ""
-    }
-
+    return {"is_valid_jd": False, "Job_Title": "", "Required_Skills": [], "Preferred_Skills": [], "Minimum_Experience": "", "Location": "", "Responsibilities": [], "Qualifications": [], "Domain": ""}
 
 
 def load_pdf_text(file_path: str) -> str:
@@ -45,7 +34,7 @@ def extract_jd_info(jd_text: str) -> dict:
         llm = Ollama(model="llama3.1:8b")
 
         # Create the enhanced prompt with validation
-        prompt = JD_VALIDATION_AND_EXTRACTION_PROMPT.replace("{{JD_TEXT}}", jd_text.strip())
+        prompt = JD_EXTRACTION_PROMPT.replace("{{JD_TEXT}}", jd_text.strip())
 
         # Get response from LLM
         response = llm.invoke(prompt).strip()
@@ -98,8 +87,7 @@ def load_document_text(file_path: str) -> str:
     """Universal document loader for PDF, DOC, DOCX"""
     file_extension = Path(file_path).suffix.lower()
 
-
-    if file_extension == '.docx':
+    if file_extension == ".docx":
         return load_docx_text(file_path)
 
     else:
@@ -121,7 +109,7 @@ def process_jd_folder_to_json():
         return
 
     # Process all DOC/DOCX files
-    supported_extensions = ['.doc', '.docx', '.pdf']
+    supported_extensions = [".doc", ".docx", ".pdf"]
     processed_count = 0
 
     for file_path in jd_folder.iterdir():
@@ -140,11 +128,7 @@ def process_jd_folder_to_json():
                 jd_structured = extract_jd_info(jd_text)
 
                 # Check if it's a valid JD
-                is_valid_jd = bool(
-                    jd_structured.get("Job_Title", "").strip() or
-                    jd_structured.get("Required_Skills", []) or
-                    jd_structured.get("Responsibilities", [])
-                )
+                is_valid_jd = bool(jd_structured.get("Job_Title", "").strip() or jd_structured.get("Required_Skills", []) or jd_structured.get("Responsibilities", []))
 
                 if is_valid_jd:
                     # Create JSON filename
@@ -152,7 +136,7 @@ def process_jd_folder_to_json():
                     json_path = jd_json_folder / json_filename
 
                     # Save JSON
-                    with open(json_path, "w", encoding='utf-8') as f:
+                    with open(json_path, "w", encoding="utf-8") as f:
                         json.dump(jd_structured, f, indent=2, ensure_ascii=False)
 
                     logger.info(f"✅ Saved: {json_filename}")
