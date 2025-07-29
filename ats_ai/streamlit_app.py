@@ -1,7 +1,6 @@
 import json
 import os
 import time
-from pathlib import Path
 
 import pymupdf
 import requests
@@ -10,7 +9,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
+BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000/")
 
 st.set_page_config(layout="wide", page_title="ATS AI")
 st.title("ATS AI : Intelligent Resume Screening")
@@ -98,11 +97,61 @@ with tab1:
                         with open(jd_path, "r") as f:
                             jd_content = json.load(f)
                         jd_source = f"Selected JD: {selected_jd_display}"
-                        st.success(f"✅ Using selected JD: **{selected_jd_display}**")
+                        # st.success(f"✅ Using selected JD: **{selected_jd_display}**")
                     else:
                         st.warning(f"JD file not found locally: {jd_filename}")
                 except Exception as e:
                     st.error(f"Error loading selected JD: {str(e)}")
+
+                # Add the main evaluate button here inside tab1
+                if selected_jd_display != "Select a pre-existing JD" and st.session_state.uploaded_resume_name:
+                    st.markdown("---")
+                    # Show re-evaluation message if already evaluated
+                    if st.session_state.parsed_data_combined is not None:
+                        st.info("🔄 Click to re-evaluate with the current JD selection")
+
+                    if st.button("🚀 Evaluate", key="main_evaluate_btn"):
+                        # Reset previous results before new evaluation
+                        st.session_state.parsed_data_combined = None
+                        st.session_state.decision_made = None
+                        st.session_state.report_evaluation_results = None
+                        st.session_state.report_parsed_resume = None
+                        st.session_state.report_cand_name = None
+
+                        with st.spinner("Processing resume and evaluating..."):
+                            try:
+                                # Read resume text
+                                resume_pdf_reader = pymupdf.open(stream=uploaded_resume.getvalue(), filetype="pdf")
+                                resume_text = ""
+                                for i in range(resume_pdf_reader.page_count):
+                                    page = resume_pdf_reader.load_page(i)
+                                    resume_text += page.get_text()
+
+                                # Upload resume file
+                                files = {"resume_file": (uploaded_resume.name, uploaded_resume.getvalue(), uploaded_resume.type)}
+                                upload_response = requests.post(f"{BACKEND_URL}/upload_resume_file", files=files)
+
+                                if upload_response.status_code != 200:
+                                    st.error(f"Failed to upload resume to backend: {upload_response.status_code} - {upload_response.text}")
+                                    st.session_state.parsed_data_combined = None
+                                    st.session_state.decision_made = None
+                                else:
+                                    if jd_content:
+                                        combined_json = {"resume_data": resume_text, "jd_json": jd_content}
+                                        response = requests.post(f"{BACKEND_URL}/parse_and_evaluate", json=combined_json)
+
+                                        if response.status_code == 200:
+                                            st.session_state.parsed_data_combined = response.json()
+                                        else:
+                                            st.error(f"Evaluation failed: {response.status_code} - {response.text}")
+                                            st.session_state.parsed_data_combined = None
+                                            st.session_state.decision_made = None
+                                    else:
+                                        st.error("Failed to process Job Description")
+                            except Exception as e:
+                                st.error(f"An error occurred during evaluation: {e}")
+                                st.session_state.parsed_data_combined = None
+                                st.session_state.decision_made = None
             else:
                 # Reset when no JD is selected
                 if st.session_state.get("current_selected_jd") is not None:
@@ -149,7 +198,8 @@ with tab2:
     if st.session_state.clear_jd_form:
         st.session_state.clear_jd_form = False
 
-    col_save, col_use = st.columns([1, 1])
+    # NEW: Enhanced button layout with Save and Evaluate side by side
+    col_save, col_evaluate = st.columns([2, 8])
 
     with col_save:
         if st.button("💾 Save JD", key="save_jd_btn"):
@@ -208,6 +258,68 @@ with tab2:
             else:
                 st.warning("📝 Please provide both JD name and JD text")
 
+    # NEW: Evaluate with temporary JD button
+    with col_evaluate:
+        # Enable evaluate button if we have JD text and uploaded resume
+        temp_evaluate_disabled = not (jd_text_input.strip() and st.session_state.uploaded_resume_name)
+
+        if st.button("🚀 Evaluate (Temp)", key="temp_evaluate_btn", disabled=temp_evaluate_disabled, help="Evaluate resume with current JD text without saving"):
+            if jd_text_input.strip() and st.session_state.uploaded_resume_name:
+                # Reset previous results before new evaluation
+                st.session_state.parsed_data_combined = None
+                st.session_state.decision_made = None
+                st.session_state.report_evaluation_results = None
+                st.session_state.report_parsed_resume = None
+                st.session_state.report_cand_name = None
+
+                with st.spinner("🔄 Processing resume with temporary JD..."):
+                    try:
+                        # Read resume text
+                        resume_pdf_reader = pymupdf.open(stream=uploaded_resume.getvalue(), filetype="pdf")
+                        resume_text = ""
+                        for i in range(resume_pdf_reader.page_count):
+                            page = resume_pdf_reader.load_page(i)
+                            resume_text += page.get_text()
+
+                        # Upload resume file
+                        files = {"resume_file": (uploaded_resume.name, uploaded_resume.getvalue(), uploaded_resume.type)}
+                        upload_response = requests.post(f"{BACKEND_URL}/upload_resume_file", files=files)
+
+                        if upload_response.status_code != 200:
+                            st.error(f"Failed to upload resume to backend: {upload_response.status_code} - {upload_response.text}")
+                        else:
+                            # Parse JD text temporarily (without saving)
+                            parse_response = requests.post(f"{BACKEND_URL}/save_jd_raw_text/", json={"jd_name": jd_name_input or "Temporary JD", "jd_text": jd_text_input})
+
+                            if parse_response.status_code == 200:
+                                response_data = parse_response.json()
+                                is_valid_jd = response_data.get("is_valid_jd", False)
+
+                                if is_valid_jd:
+                                    temp_jd_content = response_data.get("parsed_data")
+
+                                    # Evaluate with temporary JD
+                                    combined_json = {"resume_data": resume_text, "jd_json": temp_jd_content}
+                                    response = requests.post(f"{BACKEND_URL}/parse_and_evaluate", json=combined_json)
+
+                                    if response.status_code == 200:
+                                        st.session_state.parsed_data_combined = response.json()
+                                        st.success("✅ Temporary evaluation complete! (JD not saved)")
+                                        # Set source for display
+                                        jd_source = f"Temporary JD: {jd_name_input or 'Unnamed JD'}"
+                                    else:
+                                        st.error(f"Evaluation failed: {response.status_code} - {response.text}")
+                                else:
+                                    st.error("❌ The provided text is not a valid job description!")
+                            else:
+                                st.error("Failed to parse JD text for evaluation")
+
+                    except Exception as e:
+                        st.error(f"An error occurred during temporary evaluation: {e}")
+            else:
+                st.warning("📝 Please provide JD text and upload a resume first")
+
+    # Show navigation message after successful save
     if st.session_state.get("show_nav_message", False) and st.session_state.get("nav_message_time"):
         import time
 
@@ -218,87 +330,9 @@ with tab2:
             st.session_state.show_nav_message = False
             st.session_state.nav_message_time = None
 
-# Determine JD content for evaluation
-if "selected_jd_display" in locals() and selected_jd_display != "Select a pre-existing JD":
-    # Using selected JD
-    pass
-elif jd_text_input:
-    # Using text input JD - parse it for evaluation
-    if not jd_content:
-        try:
-            parse_response = requests.post(f"{BACKEND_URL}/save_jd_raw_text", data=jd_text_input.encode("utf-8"), headers={"Content-Type": "text/plain"})
-            if parse_response.status_code == 200:
-                response_data = parse_response.json()
-                jd_content = response_data.get("parsed_data")
-                jd_source = f"Text Input JD: {jd_name_input or 'Unnamed JD'}"
-        except:
-            pass
-
-# UPDATED: Single Evaluation Button with improved logic
-if st.session_state.uploaded_resume_name and (jd_content or jd_text_input):
-    # Always enable the button for re-evaluation
-    evaluate_button_disabled = False
-
-    # Show re-evaluation message if already evaluated
-    if st.session_state.parsed_data_combined is not None:
-        st.info("🔄 Click to re-evaluate with the current JD selection")
-
-    col_eval, col_clear = st.columns([2, 1])
-
-    with col_eval:
-        if st.button("🚀 Evaluate", disabled=evaluate_button_disabled):
-            # Reset previous results before new evaluation
-            st.session_state.parsed_data_combined = None
-            st.session_state.decision_made = None
-            st.session_state.report_evaluation_results = None
-            st.session_state.report_parsed_resume = None
-            st.session_state.report_cand_name = None
-
-            with st.spinner("Processing resume and evaluating..."):
-                try:
-                    # Read resume text
-                    resume_pdf_reader = pymupdf.open(stream=uploaded_resume.getvalue(), filetype="pdf")
-                    resume_text = ""
-                    for i in range(resume_pdf_reader.page_count):
-                        page = resume_pdf_reader.load_page(i)
-                        resume_text += page.get_text()
-
-                    # Upload resume file
-                    files = {"resume_file": (uploaded_resume.name, uploaded_resume.getvalue(), uploaded_resume.type)}
-                    upload_response = requests.post(f"{BACKEND_URL}/upload_resume_file", files=files)
-
-                    if upload_response.status_code != 200:
-                        st.error(f"Failed to upload resume to backend: {upload_response.status_code} - {upload_response.text}")
-                        st.session_state.parsed_data_combined = None
-                        st.session_state.decision_made = None
-                    else:
-                        # Use existing JD or parse text JD
-                        final_jd_content = jd_content
-                        if not final_jd_content and jd_text_input:
-                            # Parse JD text
-                            parse_response = requests.post(f"{BACKEND_URL}/save_jd_raw_text", data=jd_text_input.encode("utf-8"), headers={"Content-Type": "text/plain"})
-                            if parse_response.status_code == 200:
-                                response_data = parse_response.json()
-                                final_jd_content = response_data.get("parsed_data")
-
-                        if final_jd_content:
-                            combined_json = {"resume_data": resume_text, "jd_json": final_jd_content}
-                            response = requests.post(f"{BACKEND_URL}/parse_and_evaluate", json=combined_json)
-
-                            if response.status_code == 200:
-                                st.session_state.parsed_data_combined = response.json()
-                                st.success("✅ Evaluation Complete!")
-                            else:
-                                st.error(f"Evaluation failed: {response.status_code} - {response.text}")
-                                st.session_state.parsed_data_combined = None
-                                st.session_state.decision_made = None
-                        else:
-                            st.error("Failed to process Job Description")
-                except Exception as e:
-                    st.error(f"An error occurred during evaluation: {e}")
-                    st.session_state.parsed_data_combined = None
-                    st.session_state.decision_made = None
-
+# Show current JD being used for evaluation
+if st.session_state.parsed_data_combined and jd_source:
+    st.info(f"📋 Evaluation performed using: **{jd_source}**")
 
 # Display Results - SCOREBOARD FIRST, then parsed resume details
 if st.session_state.parsed_data_combined:

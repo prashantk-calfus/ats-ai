@@ -238,6 +238,7 @@ EVALUATION_PROMPT = """
     {jd_json}
 """.strip()
 
+
 EVALUATION_AND_PARSING_PROMPT = """
     You are a multi-stage evaluation AI. Your job is to:
 
@@ -294,11 +295,25 @@ EVALUATION_AND_PARSING_PROMPT = """
     2. **Use the EXACT JSON structure provided below.** Adhere strictly to all keys, data types, and nesting.
     3. **Handle Missing Information:**
     * For **single string fields** (e.g., "Name", "Mobile_No", "Github_Repo"), if information is missing, use the string value "NA".
-    * For **lists/arrays** (e.g., "Education", "Professional_Experience", "Projects", "Certifications", "Programming_Language", "Frameworks", "Technologies"), if no relevant entries are found, return an **empty array []**. 
+    * For **lists/arrays** (e.g., "Education", "Professional_Experience", "Projects", "Certifications", "Programming_Language", "Frameworks", "Technologies"), if no relevant entries are found, return an **empty array []**.
       Do not return an object with "NA" values inside an empty array.
     4. **All JSON keys must be in double quotes.**
     5. **Be thorough and accurate** - don't invent information that isn't there.
     6. **Pay special attention to technical skills, programming languages, and frameworks.**
+    7. **The resume and JD may express skills, tools, and frameworks differently.** Do not expect exact word matches.**
+    8. **Use reasoning and industry knowledge to infer relationships between tools and core skills.** Examples:
+       * If the JD asks for **"Python"**, and the resume includes **"FastAPI"** or **"LangChain"**, infer the candidate likely knows Python.
+       * If the JD requires **"DevOps"**, and the resume lists tools like **"Terraform"**, **"GitHub Actions"**, or **"CI/CD pipelines"**, consider it aligned.
+       * If the JD mentions **"Cloud Platforms"**, and the resume includes **"AWS"**, **"GCP"**, or **"Azure"**, treat it as a match.**
+    9. **Avoid marking a skill as "missing" if it is clearly demonstrated or implied through tools, frameworks, or project context.**
+    10.**You must reason about technical synonymy.** Related tools or domains should contribute toward skills match, even if not worded identically.
+    11.**Award partial or full credit for implied or demonstrated knowledge** based on:
+       * Tools used in projects
+       * Responsibilities or achievements
+       * Specific technologies mentioned in context**
+    12.**Recognize synonyms and related technologies** (e.g., "Flask" relates to Python; "Kubernetes" relates to DevOps/cloud).
+   13.**Only report a skill as missing if it's listed in the JD's Required_Skills but has no clear evidence in the resume. Do not evaluate skills not mentioned in the JD.**
+    14.**CRITICAL: Base your evaluation ONLY on the skills listed in the job description. Ignore any resume skills that are not mentioned in the JD's requirements.**
 
     "Evaluation" must contain the following fields:
 
@@ -319,12 +334,14 @@ EVALUATION_AND_PARSING_PROMPT = """
           "bullet point 2"
         ],
         "Skills Match": [
-            "List specific skills explicitly mentioned in JD and found/used in resume (e.g., 'Node.js: used in API Gateway development, Enphase Energy')",
-            "List quantifiable outcomes tied to skills where possible (e.g., 'BiLSTM: achieved 92% accuracy in Phonocardiogram Project')"
+            "ONLY list skills that are present in the JD's Required_Skills or Preferred_Skills arrays AND found in the resume",
+            "For each matched skill, explain how it's demonstrated in the resume",
+            "Do NOT include skills that are not mentioned in the job description"
         ],
         "Required_Skills_Missing_from_Resume": [
-            "List REQUIRED skills from JD that are absent or not demonstrated in the resume"
+          "List only JD-required skills that are not explicitly or implicitly shown in the resume. Do NOT list skills as missing if they are implied through related tools, frameworks, or project experience."
         ],
+
         "Extra skills": [
             "List additional skills candidate has beyond job requirements (for context, do not factor into main scores)"
         ],
@@ -379,8 +396,6 @@ EVALUATION_AND_PARSING_PROMPT = """
 
 """.strip()
 
-
-
 JD_VALIDATION_AND_EXTRACTION_PROMPT = """
 You are an AI assistant that analyzes text to determine if it's a valid job description and extracts structured information.
 
@@ -417,4 +432,3 @@ If this IS a valid job description, extract and structure the information as JSO
 
 Respond ONLY with valid JSON, no additional text.
 """
-

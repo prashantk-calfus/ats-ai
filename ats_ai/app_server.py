@@ -1,20 +1,20 @@
+import asyncio
 import json
 import logging
 import os
 import re
 import shutil
-from pathlib import Path
+import threading
 from typing import Any, Dict
 
-import fitz
-import uvicorn
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from apscheduler.schedulers.background import BackgroundScheduler
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from langchain_community.document_loaders import PyMuPDFLoader
 from pydantic import BaseModel
 from starlette import status
-from starlette.responses import JSONResponse, RedirectResponse
+from starlette.responses import RedirectResponse
 
-from ats_ai.agent.jd_parser import create_empty_jd_structure, extract_jd_info
+from ats_ai.agent.jd_parser import extract_jd_info
 
 # ---- Import your agent functions ----
 from ats_ai.agent.llm_agent import (
@@ -22,6 +22,7 @@ from ats_ai.agent.llm_agent import (
     evaluate_resume_against_jd,
     extract_resume_info,
 )
+from ats_ai.scraper import CalfusJobScraper
 
 # ---- Constants ----
 RESUME_UPLOAD_FOLDER = "data/"
@@ -113,7 +114,6 @@ async def store_candidate_evaluation(eval_json: Dict[str, Any]):
 
 @app.get("/list_jds", status_code=status.HTTP_200_OK)
 async def list_jds():
-
     try:
         os.makedirs(JD_UPLOAD_FOLDER, exist_ok=True)  # Ensure folder exists
 
@@ -180,6 +180,93 @@ async def process_jd_folder():
 @app.get("/")
 async def docs():
     return RedirectResponse("/docs")
+
+
+@app.post("/trigger_scraper", status_code=status.HTTP_200_OK)
+async def trigger_scraper():
+    """Manually trigger the scraper job"""
+    try:
+        # Run in background thread to avoid blocking
+        thread = threading.Thread(target=run_scraper_job)
+        thread.start()
+
+        return {"message": "Scraper job triggered successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to trigger scraper: {e}")
+
+
+def run_scraper_and_convert_job():
+    """Main background job that runs scraper AND converts to JSON"""
+    try:
+        logger.info("Starting scraper and conversion job...")
+
+        # Step 1: Run the scraper
+        scraper = CalfusJobScraper()
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(scraper.run())
+        loop.close()
+
+        logger.info("Scraper completed - now converting JDs to JSON...")
+
+        # Step 2: Automatically convert DOCX files to JSON
+        from ats_ai.agent.jd_parser import process_jd_folder_to_json
+
+        processed_count = process_jd_folder_to_json()
+
+        logger.info(f"Complete job finished: Scraped JDs and converted {processed_count} files to JSON")
+
+    except Exception as e:
+        logger.error(f"Scraper and conversion job failed: {e}")
+
+
+def run_scraper_job():
+    """Legacy wrapper - calls the main scraper and convert job"""
+    run_scraper_and_convert_job()
+
+
+def start_scheduler():
+    """Initialize and start the background scheduler"""
+    scheduler = BackgroundScheduler()
+
+    # Schedule to run daily at 2:30 AM - now includes automatic JSON conversion
+    scheduler.add_job(run_scraper_and_convert_job, "cron", hour=1, minute=00, id="daily_scraper_and_converter", replace_existing=True)  # Use the enhanced function
+
+    scheduler.start()
+    logger.info("Background scheduler started - scraper + JSON conversion will run daily at 2:30 AM")
+    return scheduler
+
+
+# NEW ENDPOINT: Trigger scraper with automatic conversion
+@app.post("/trigger_scraper_with_conversion", status_code=status.HTTP_200_OK)
+async def trigger_scraper_with_conversion():
+    """Manually trigger the scraper job WITH automatic JSON conversion"""
+    try:
+        # Run in background thread to avoid blocking
+        thread = threading.Thread(target=run_scraper_and_convert_job)
+        thread.start()
+
+        return {"message": "Scraper job with automatic JSON conversion triggered successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to trigger scraper with conversion: {e}")
+
+
+# Global scheduler variable
+scheduler = None
+
+
+@app.on_event("startup")
+def startup_event():
+
+    start_scheduler()
+
+
+@app.on_event("shutdown")
+def shutdown_event():
+
+    if scheduler:
+        scheduler.shutdown()
+        logger.info("Background scheduler stopped")
 
 
 # ---- Run ----
