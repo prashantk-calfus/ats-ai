@@ -397,14 +397,60 @@ EVALUATION_AND_PARSING_PROMPT = """
 """.strip()
 
 JD_VALIDATION_AND_EXTRACTION_PROMPT = """
-You are an AI assistant that analyzes text to determine if it's a valid job description and extracts structured information.
+You are an expert AI assistant specialized in analyzing and extracting structured information from job descriptions. 
 
-First, analyze if the following text is a legitimate job description or just random text/greeting/name.
+**TASK**: Perform a comprehensive step-by-step analysis to determine if the given text is a legitimate job description, then extract structured information accordingly.
 
-Text to analyze:
+**STEP-BY-STEP ANALYSIS PROCESS**:
+
+**STEP 1: Content Analysis**
+- Examine the text length, structure, and overall coherence
+- Identify if the text contains professional, business-oriented language
+- Check for presence of job-related terminology and context
+
+**STEP 2: Job Description Indicators Assessment**
+Analyze for the presence of these key indicators:
+- Job titles, roles, or position names
+- Skills, technologies, or competencies mentioned
+- Experience requirements or career level indicators
+- Responsibilities, duties, or task descriptions
+- Qualifications, education, or certification requirements
+- Company context, industry domain, or work environment details
+- Employment conditions (salary, benefits, location, work type)
+
+**STEP 3: Content Quality Evaluation**
+- Assess if the content is substantive enough for a real job posting
+- Verify the text maintains professional tone throughout
+- Check if information flows logically as a job description would
+
+**STEP 4: Validation Decision**
+Based on your analysis, determine:
+- Does this text represent a legitimate job description that would be posted by an employer?
+- Is there sufficient job-related information to warrant extraction?
+- Would a job seeker find this content useful for understanding a role?
+
+**STEP 5: Information Extraction** (Only if validated as legitimate JD)
+If the text passes validation, extract the following structured information:
+- Job_Title: The primary role/position title
+- Required_Skills: Essential/mandatory skills, technologies, or competencies
+- Preferred_Skills: Nice-to-have or preferred skills and technologies  
+- Minimum_Experience: Required years of experience or experience level
+- Location: Work location, remote/hybrid options, or geographic requirements
+- Responsibilities: Key duties, tasks, and accountabilities
+- Qualifications: Educational requirements, certifications, or credentials
+- Domain: Industry sector, business domain, or field of work
+
+**OUTPUT REQUIREMENTS**:
+- Respond ONLY with valid JSON in the exact format specified below
+- No explanations, commentary, or additional text outside the JSON structure
+- Use your analytical reasoning to make informed extraction decisions
+
+**TEXT TO ANALYZE**:
 {{JD_TEXT}}
 
-If this is NOT a valid job description (like "see u", "hello", random text, just a name, etc.), respond with:
+**REQUIRED JSON OUTPUT FORMAT**:
+
+If NOT a valid job description:
 {
     "is_valid_jd": false,
     "Job_Title": "",
@@ -417,18 +463,26 @@ If this is NOT a valid job description (like "see u", "hello", random text, just
     "Domain": ""
 }
 
-If this IS a valid job description, extract and structure the information as JSON:
+If IS a valid job description:
 {
     "is_valid_jd": true,
     "Job_Title": "extracted job title",
-    "Required_Skills": ["skill1", "skill2"],
+    "Required_Skills": ["skill1", "skill2", "skill3"],
     "Preferred_Skills": ["skill1", "skill2"],
-    "Minimum_Experience": "X years",
-    "Location": "location",
-    "Responsibilities": ["responsibility1", "responsibility2"],
+    "Minimum_Experience": "X years" or "Entry level" or "Senior level",
+    "Location": "specific location or Remote/Hybrid",
+    "Responsibilities": ["responsibility1", "responsibility2", "responsibility3"],
     "Qualifications": ["qualification1", "qualification2"],
-    "Domain": "domain/industry"
+    "Domain": "industry/domain (e.g., Technology, Healthcare, Finance)"
 }
 
-Respond ONLY with valid JSON, no additional text.
+**EXTRACTION GUIDELINES**:
+- Be thorough but precise in your extraction
+- Distinguish between required vs preferred skills based on language cues
+- Extract specific responsibilities rather than generic statements
+- Identify the most appropriate industry domain based on context
+- Use "Not specified" for fields that are typically present in JDs but missing in this text
+- Ensure arrays contain meaningful, distinct items rather than redundant entries
+
+Return ONLY the JSON structure with no additional text.
 """
