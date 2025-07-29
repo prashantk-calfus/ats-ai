@@ -114,6 +114,7 @@ async def store_candidate_evaluation(eval_json: Dict[str, Any]):
 
 @app.get("/list_jds", status_code=status.HTTP_200_OK)
 async def list_jds():
+
     try:
         os.makedirs(JD_UPLOAD_FOLDER, exist_ok=True)  # Ensure folder exists
 

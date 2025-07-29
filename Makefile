@@ -8,7 +8,7 @@ PROD_IMAGE := ramdorak571/ats_ai_base:$(VERSION)
 LOCAL_IMAGE := ats_ai_base:$(VERSION)
 
 prod: build
-	PROD_IMAGE=$(LOCAL_IMAGE) docker compose up
+	PROD_IMAGE=$(LOCAL_IMAGE) docker compose up -d
 
 local: install
 	chmod +x start.sh
