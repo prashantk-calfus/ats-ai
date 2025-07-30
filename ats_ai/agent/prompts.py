@@ -284,29 +284,39 @@ EVALUATION_AND_PARSING_PROMPT = """
 
 
     CRITICAL INSTRUCTIONS:
-    1. **Return ONLY VALID JSON.** No explanations, no commentary, no additional text outside the JSON structure.
-    2. **Use the EXACT JSON structure provided below.** Adhere strictly to all keys, data types, and nesting.
-    3. **Handle Missing Information:**
+    1.**PRE-EVALUATION JD VALIDATION:** If the provided 'Job Description' text appears to be a short, generic phrase (e.g., "senior python role", "hi", "random text") and does not contain sufficient detail to constitute a proper job description:
+       * Set "Experience_Score", "Skills_Score", "Projects_Score", "Education_Score" to 0.0.
+       * Set "Overall_Weighted_Score" to 0.0.
+       * Set "Match_Percentage" to "0.0%".
+       * Set "Qualification Status" to "Not Qualified - Invalid Job Description".
+       * Populate "Comments" with "The provided Job Description is too brief or generic for a meaningful evaluation."
+       * For "Skills Match", "Required_Skills_Missing_from_Resume", "Extra skills", "Pros", "Cons", and "Missing_Requirements", return empty arrays `[]`.
+       * **Only proceed with the detailed evaluation and scoring criteria if the Job Description is deemed substantial and valid.**
+       
+     
+    2. **Return ONLY VALID JSON.** No explanations, no commentary, no additional text outside the JSON structure.
+    3. **Use the EXACT JSON structure provided below.** Adhere strictly to all keys, data types, and nesting.
+    4. **Handle Missing Information:**
     * For **single string fields** (e.g., "Name", "Mobile_No", "Github_Repo"), if information is missing, use the string value "NA".
     * For **lists/arrays** (e.g., "Education", "Professional_Experience", "Projects", "Certifications", "Programming_Language", "Frameworks", "Technologies"), if no relevant entries are found, return an **empty array []**.
       Do not return an object with "NA" values inside an empty array.
-    4. **All JSON keys must be in double quotes.**
-    5. **Be thorough and accurate** - don't invent information that isn't there.
-    6. **Pay special attention to technical skills, programming languages, and frameworks.**
-    7. **The resume and JD may express skills, tools, and frameworks differently.** Do not expect exact word matches.**
-    8. **Use reasoning and industry knowledge to infer relationships between tools and core skills.** Examples:
+    5. **All JSON keys must be in double quotes.**
+    6. **Be thorough and accurate** - don't invent information that isn't there.
+    7. **Pay special attention to technical skills, programming languages, and frameworks.**
+    8. **The resume and JD may express skills, tools, and frameworks differently.** Do not expect exact word matches.**
+    9. **Use reasoning and industry knowledge to infer relationships between tools and core skills.** Examples:
        * If the JD asks for **"Python"**, and the resume includes **"FastAPI"** or **"LangChain"**, infer the candidate likely knows Python.
        * If the JD requires **"DevOps"**, and the resume lists tools like **"Terraform"**, **"GitHub Actions"**, or **"CI/CD pipelines"**, consider it aligned.
        * If the JD mentions **"Cloud Platforms"**, and the resume includes **"AWS"**, **"GCP"**, or **"Azure"**, treat it as a match.**
-    9. **Avoid marking a skill as "missing" if it is clearly demonstrated or implied through tools, frameworks, or project context.**
-    10.**You must reason about technical synonymy.** Related tools or domains should contribute toward skills match, even if not worded identically.
-    11.**Award partial or full credit for implied or demonstrated knowledge** based on:
+    10. **Avoid marking a skill as "missing" if it is clearly demonstrated or implied through tools, frameworks, or project context.**
+    11.**You must reason about technical synonymy.** Related tools or domains should contribute toward skills match, even if not worded identically.
+    12.**Award partial or full credit for implied or demonstrated knowledge** based on:
        * Tools used in projects
        * Responsibilities or achievements
        * Specific technologies mentioned in context**
-    12.**Recognize synonyms and related technologies** (e.g., "Flask" relates to Python; "Kubernetes" relates to DevOps/cloud).
-   13.**Only report a skill as missing if it's listed in the JD's Required_Skills but has no clear evidence in the resume. Do not evaluate skills not mentioned in the JD.**
-    14.**CRITICAL: Base your evaluation ONLY on the skills listed in the job description. Ignore any resume skills that are not mentioned in the JD's requirements.**
+    13.**Recognize synonyms and related technologies** (e.g., "Flask" relates to Python; "Kubernetes" relates to DevOps/cloud).
+   14.**Only report a skill as missing if it's listed in the JD's Required_Skills but has no clear evidence in the resume. Do not evaluate skills not mentioned in the JD.**
+    15.**CRITICAL: Base your evaluation ONLY on the skills listed in the job description. Ignore any resume skills that are not mentioned in the JD's requirements.**
 
     "Evaluation" must contain the following fields:
 
@@ -388,6 +398,7 @@ EVALUATION_AND_PARSING_PROMPT = """
     Job Description: {job_description}
 
 """.strip()
+
 
 # JD_VALIDATION_AND_EXTRACTION_PROMPT = """
 # You are an expert AI assistant specialized in analyzing and extracting structured information from job descriptions.

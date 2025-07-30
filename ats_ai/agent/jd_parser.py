@@ -4,13 +4,19 @@ import os
 from pathlib import Path
 
 import mammoth
+from dotenv import load_dotenv
+from google import genai
 from langchain_community.document_loaders import PyMuPDFLoader
-from langchain_community.llms import Ollama
 
 from ats_ai.agent.llm_agent import extract_json_block
 from ats_ai.agent.prompts import JD_EXTRACTION_PROMPT
 
 logger = logging.getLogger(__name__)
+
+load_dotenv()
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+gemini_model = genai.Client()
 
 
 def create_empty_jd_structure() -> dict:
@@ -35,25 +41,19 @@ def load_pdf_text(file_path: str) -> str:
 
 
 def extract_jd_info(jd_text: str) -> dict:
-    """
-    Extract JD information from any text .
 
-    Always returns structured data regardless of input quality.
-    """
     try:
-        # Initialize the LLM
-        llm = Ollama(model="llama3.1:8b", temperature=0.1)
-
         # Create the prompt
-        # prompt = JD_EXTRACTION_PROMPT.replace("{{JD_TEXT}}", jd_text.strip())
         prompt = JD_EXTRACTION_PROMPT.format(jd_text=jd_text.strip())
 
-        # Get response from LLM
-        response = llm.invoke(prompt).strip()
-        logger.info(f"Raw JD Extraction Output:\n{response}")
+        # Get response from Gemini
+        response = gemini_model.models.generate_content(model="gemini-2.0-flash", contents=prompt)
+        raw_response = response.text.strip()
+
+        logger.info(f"Raw JD Extraction Output:\n{raw_response}")
 
         # Extract and parse JSON
-        parsed_response = extract_json_block(response)
+        parsed_response = extract_json_block(raw_response)
 
         # Ensure all required fields exist with default values if missing
         default_structure = {"Job_Title": "NA", "Required_Skills": [], "Preferred_Skills": [], "Minimum_Experience": "NA", "Location": "NA", "Responsibilities": [], "Qualifications": [], "Domain": "NA", "Key_considerations_for_hiring": []}
@@ -66,7 +66,7 @@ def extract_jd_info(jd_text: str) -> dict:
 
     except json.JSONDecodeError as e:
         logger.error(f"Failed to parse JD JSON: {e}")
-        logger.error(f"Raw response: {response}")
+        logger.error(f"Raw response: {raw_response}")
         # Return default structure instead of empty
         return {
             "Job_Title": "Extracted from Text",
