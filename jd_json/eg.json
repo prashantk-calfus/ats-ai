@@ -1,0 +1,27 @@
+{
+  "Job_Title": "Data Scientist",
+  "Required_Skills": [
+    "Python programming skills",
+    "Machine learning algorithms and techniques",
+    "Experience with data visualization tools (e.g., Tableau, Power BI)",
+    "Strong understanding of statistical concepts and mathematical modeling"
+  ],
+  "Preferred_Skills": [
+    "Familiarity with deep learning frameworks (e.g., TensorFlow, PyTorch)"
+  ],
+  "Minimum_Experience": "5+ years",
+  "Location": "Remote",
+  "Responsibilities": [
+    "Develop predictive models to drive business decisions",
+    "Collaborate with cross-functional teams to identify data-driven solutions",
+    "Design and implement data visualization dashboards to communicate insights"
+  ],
+  "Qualifications": [
+    "Master's degree in Computer Science, Statistics, or related field"
+  ],
+  "Domain": "Data Science/AI",
+  "Key_considerations_for_hiring": [
+    "Strong communication skills to effectively present complex ideas to non-technical stakeholders",
+    "Ability to work independently and as part of a team"
+  ]
+}

@@ -8,23 +8,26 @@ CRITICAL RULES:
 2. If a field is missing in the JD, return "NA" or an empty list as appropriate.
 3. Use the exact structure and keys as specified below.
 4. Be comprehensive, but avoid duplication or invented content.
+5. Extract information from ANY text provided - do not validate if it's a proper JD or not.
 
 RETURN FORMAT (strictly follow this):
 {{
-  "Job_Title": "Job title as mentioned",
-  "Required_Skills": ["list of must-have skills, tools, or technologies"],
-  "Preferred_Skills": ["list of nice-to-have skills or tools"],
-  "Minimum_Experience": "minimum experience required (e.g., '3+ years')",
+  "Job_Title": "Job title as mentioned or inferred from the text",
+  "Required_Skills": ["list of must-have skills, tools, or technologies mentioned"],
+  "Preferred_Skills": ["list of nice-to-have skills or tools mentioned"],
+  "Minimum_Experience": "minimum experience required (e.g., '3+ years') or 'NA'",
   "Location": "location mentioned (or 'Remote', 'Hybrid', or 'NA')",
   "Responsibilities": ["key responsibilities extracted as list items"],
   "Qualifications": ["required degrees, certifications, or qualifications"],
-  "Key considerations for hiring" : ["list down very important factors detrimental for hiring"]
+  "Domain": "industry or domain mentioned or inferred",
+  "Key_considerations_for_hiring": ["list down very important factors detrimental for hiring"]
 }}
 
-JD TEXT:
+ JD TEXT:
 \"\"\"
 {jd_text}
 \"\"\"
+
 
 Return only the structured JSON output.
 """.strip()

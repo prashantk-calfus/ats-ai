@@ -97,7 +97,6 @@ with tab1:
                         with open(jd_path, "r") as f:
                             jd_content = json.load(f)
                         jd_source = f"Selected JD: {selected_jd_display}"
-                        # st.success(f"✅ Using selected JD: **{selected_jd_display}**")
                     else:
                         st.warning(f"JD file not found locally: {jd_filename}")
                 except Exception as e:
@@ -198,50 +197,27 @@ with tab2:
     if st.session_state.clear_jd_form:
         st.session_state.clear_jd_form = False
 
-    # NEW: Enhanced button layout with Save and Evaluate side by side
+    # Enhanced button layout with Save and Evaluate side by side
     col_save, col_evaluate = st.columns([2, 8])
 
     with col_save:
         if st.button("💾 Save JD", key="save_jd_btn"):
             if jd_name_input and jd_text_input:
-                with st.spinner("🤖 Analyzing JD with AI intelligence..."):
+                with st.spinner("💾 Saving JD..."):
                     try:
-                        # Use the enhanced endpoint
                         save_response = requests.post(f"{BACKEND_URL}/save_jd_raw_text/", json={"jd_name": jd_name_input, "jd_text": jd_text_input})
 
                         if save_response.status_code == 200:
                             response_data = save_response.json()
-                            is_valid_jd = response_data.get("is_valid_jd", True)
-                            validation_method = response_data.get("validation_method", "AI analysis")
+                            st.success(f"✅ JD '{jd_name_input}' saved successfully!")
 
-                            if is_valid_jd:
-                                st.success(f"✅ JD '{jd_name_input}' saved successfully!")
-
-                            else:
-                                # Show error message for invalid JD and auto-hide after 2 minutes
-                                error_placeholder = st.empty()
-                                with error_placeholder.container():
-                                    st.error(f"❌ '{jd_name_input}' is not a valid job description!")
-
-                                # Auto-clear the error message after 2 minutes (120 seconds)
-                                import threading
-
-                                def clear_error():
-                                    import time
-
-                                    time.sleep(120)  # 2 minutes
-                                    error_placeholder.empty()
-
-                                threading.Thread(target=clear_error, daemon=True).start()
-
-                            # Clear fields only if valid JD was saved
-                            if is_valid_jd:
-                                st.session_state.jd_name_input = ""
-                                st.session_state.jd_text_input = ""
-                                st.session_state.show_nav_message = True
-                                st.session_state.nav_message_time = time.time()
-                                st.session_state.clear_jd_form = True
-                                st.rerun()
+                            # Clear fields after successful save
+                            st.session_state.jd_name_input = ""
+                            st.session_state.jd_text_input = ""
+                            st.session_state.show_nav_message = True
+                            st.session_state.nav_message_time = time.time()
+                            st.session_state.clear_jd_form = True
+                            st.rerun()
 
                         else:
                             error_detail = save_response.json().get("detail", save_response.text)
@@ -258,7 +234,7 @@ with tab2:
             else:
                 st.warning("📝 Please provide both JD name and JD text")
 
-    # NEW: Evaluate with temporary JD button
+    # Evaluate with temporary JD button
     with col_evaluate:
         # Enable evaluate button if we have JD text and uploaded resume
         temp_evaluate_disabled = not (jd_text_input.strip() and st.session_state.uploaded_resume_name)
@@ -288,37 +264,31 @@ with tab2:
                         if upload_response.status_code != 200:
                             st.error(f"Failed to upload resume to backend: {upload_response.status_code} - {upload_response.text}")
                         else:
-                            # Parse JD text temporarily (without saving)
-                            parse_response = requests.post(f"{BACKEND_URL}/save_jd_raw_text/", json={"jd_name": jd_name_input or "Temporary JD", "jd_text": jd_text_input})
+                            # Parse JD text temporarily WITHOUT saving to backend
+                            temp_parse_response = requests.post(f"{BACKEND_URL}/parse_jd_temp/", json={"jd_text": jd_text_input})
 
-                            if parse_response.status_code == 200:
-                                response_data = parse_response.json()
-                                is_valid_jd = response_data.get("is_valid_jd", False)
+                            if temp_parse_response.status_code == 200:
+                                response_data = temp_parse_response.json()
+                                temp_jd_content = response_data.get("parsed_data")
 
-                                if is_valid_jd:
-                                    temp_jd_content = response_data.get("parsed_data")
+                                # Evaluate with temporary JD using the parsed content directly
+                                combined_json = {"resume_data": resume_text, "jd_json": temp_jd_content}
+                                response = requests.post(f"{BACKEND_URL}/parse_and_evaluate", json=combined_json)
 
-                                    # Evaluate with temporary JD
-                                    combined_json = {"resume_data": resume_text, "jd_json": temp_jd_content}
-                                    response = requests.post(f"{BACKEND_URL}/parse_and_evaluate", json=combined_json)
-
-                                    if response.status_code == 200:
-                                        st.session_state.parsed_data_combined = response.json()
-                                        st.success("✅ Temporary evaluation complete! (JD not saved)")
-                                        # Set source for display
-                                        jd_source = f"Temporary JD: {jd_name_input or 'Unnamed JD'}"
-                                    else:
-                                        st.error(f"Evaluation failed: {response.status_code} - {response.text}")
+                                if response.status_code == 200:
+                                    st.session_state.parsed_data_combined = response.json()
+                                    st.success("✅ Temporary evaluation complete! (JD not saved)")
+                                    # Set source for display
+                                    jd_source = f"Temporary JD: {jd_name_input or 'Unnamed JD'}"
                                 else:
-                                    st.error("❌ The provided text is not a valid job description!")
+                                    st.error(f"Evaluation failed: {response.status_code} - {response.text}")
                             else:
-                                st.error("Failed to parse JD text for evaluation")
+                                st.error("Failed to parse JD text for temporary evaluation")
 
                     except Exception as e:
                         st.error(f"An error occurred during temporary evaluation: {e}")
             else:
                 st.warning("📝 Please provide JD text and upload a resume first")
-
     # Show navigation message after successful save
     if st.session_state.get("show_nav_message", False) and st.session_state.get("nav_message_time"):
         import time
