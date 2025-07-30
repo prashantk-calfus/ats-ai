@@ -205,7 +205,6 @@ async def docs():
 
 @app.post("/trigger_scraper", status_code=status.HTTP_200_OK)
 async def trigger_scraper():
-    """Manually trigger the scraper job"""
     try:
         # Run in background thread to avoid blocking
         thread = threading.Thread(target=run_scraper_job)
@@ -217,7 +216,6 @@ async def trigger_scraper():
 
 
 def run_scraper_and_convert_job():
-    """Main background job that runs scraper AND converts to JSON"""
     try:
         logger.info("Starting scraper and conversion job...")
 
@@ -242,7 +240,6 @@ def run_scraper_and_convert_job():
 
 
 def run_scraper_job():
-    """Legacy wrapper - calls the main scraper and convert job"""
     run_scraper_and_convert_job()
 
 
@@ -258,7 +255,6 @@ def start_scheduler():
     return scheduler
 
 
-# NEW ENDPOINT: Trigger scraper with automatic conversion
 @app.post("/trigger_scraper_with_conversion", status_code=status.HTTP_200_OK)
 async def trigger_scraper_with_conversion():
     """Manually trigger the scraper job WITH automatic JSON conversion"""

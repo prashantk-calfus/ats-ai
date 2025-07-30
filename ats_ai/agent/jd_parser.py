@@ -36,7 +36,7 @@ def load_pdf_text(file_path: str) -> str:
 
 def extract_jd_info(jd_text: str) -> dict:
     """
-    Extract JD information from any text without validation.
+    Extract JD information from any text .
     Always returns structured data regardless of input quality.
     """
     try:
