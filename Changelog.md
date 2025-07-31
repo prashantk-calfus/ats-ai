@@ -18,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ---
 
 
+## [0.2.5] - 2025-07-31
+### Fixed
+- Optimised project scoring criteria for better evaluation accuracy.
+
+
+---
+
 ## [0.2.4] - 2025-07-31
 ### Added
 - Support for saving a custom JD file for future evaluations.
@@ -25,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Weekly scheduler to scrape JDs from Calfus website and adding it to the application.
 - Support for exporting reports in PDF format.
 
-
+---
 
 ## How to Use This File
 
