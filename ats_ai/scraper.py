@@ -1,11 +1,10 @@
 import asyncio
-import os
-import re
-from playwright.async_api import async_playwright
-from pathlib import Path
-from docx import Document
-from docx.shared import Inches
 import datetime
+import re
+from pathlib import Path
+
+from docx import Document
+from playwright.async_api import async_playwright
 
 
 class CalfusJobScraper:
@@ -22,10 +21,10 @@ class CalfusJobScraper:
     def sanitize_filename(self, title):
         """Sanitize job title for filename"""
         # Remove special characters and replace spaces with underscores
-        sanitized = re.sub(r'[<>:"/\\|?*]', '', title)
-        sanitized = re.sub(r'\s+', '_', sanitized.strip())
+        sanitized = re.sub(r'[<>:"/\\|?*]', "", title)
+        sanitized = re.sub(r"\s+", "_", sanitized.strip())
         # Remove common unwanted prefixes
-        sanitized = sanitized.replace('Current_Job_Openings_', '')
+        sanitized = sanitized.replace("Current_Job_Openings_", "")
         return sanitized
 
     def clean_job_content(self, content):
@@ -33,33 +32,42 @@ class CalfusJobScraper:
         if not content:
             return ""
 
-        lines = content.split('\n')
+        lines = content.split("\n")
         cleaned_lines = []
         skip_current_section = False
 
         # Keywords that indicate sections to skip
         skip_section_keywords = [
-            'about us', 'about the company', 'company overview', 'who we are',
-            'our company', 'company profile', 'organization overview',
-            'apply now', 'how to apply', 'application process',
-            'source url', 'scraped date', 'contact us', 'get in touch',
-            'follow us', 'social media', 'connect with us',
-            'navigation', 'menu', 'home', 'careers', 'lets connect',
-            'join us', 'our work', 'agent foundry', 'benefits and perks'
+            "about us",
+            "about the company",
+            "company overview",
+            "who we are",
+            "our company",
+            "company profile",
+            "organization overview",
+            "apply now",
+            "how to apply",
+            "application process",
+            "source url",
+            "scraped date",
+            "contact us",
+            "get in touch",
+            "follow us",
+            "social media",
+            "connect with us",
+            "navigation",
+            "menu",
+            "home",
+            "careers",
+            "lets connect",
+            "join us",
+            "our work",
+            "agent foundry",
+            "benefits and perks",
         ]
 
         # Patterns that indicate metadata or unwanted content
-        skip_patterns = [
-            r'^\*\*Source URL:\s*\*\*',
-            r'^\*\*Scraped Date:\s*\*\*',
-            r'^https?://',
-            r'^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}',
-            r'^Apply Now\s*$',
-            r'^Back\s*$',
-            r'^Home\s*$',
-            r'^Menu\s*$',
-            r'^Navigation\s*$'
-        ]
+        skip_patterns = [r"^\*\*Source URL:\s*\*\*", r"^\*\*Scraped Date:\s*\*\*", r"^https?://", r"^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}", r"^Apply Now\s*$", r"^Back\s*$", r"^Home\s*$", r"^Menu\s*$", r"^Navigation\s*$"]
 
         for line in lines:
             line = line.strip()
@@ -67,7 +75,7 @@ class CalfusJobScraper:
             # Skip empty lines initially, we'll add them back strategically
             if not line:
                 if cleaned_lines and cleaned_lines[-1]:  # Only add empty line if previous line wasn't empty
-                    cleaned_lines.append('')
+                    cleaned_lines.append("")
                 continue
 
             # Check if line matches skip patterns
@@ -84,13 +92,13 @@ class CalfusJobScraper:
             line_lower = line.lower()
 
             # Reset skip flag for new sections
-            if line.endswith(':') or re.match(r'^[A-Z][^a-z]*:?$', line):
+            if line.endswith(":") or re.match(r"^[A-Z][^a-z]*:?$", line):
                 skip_current_section = any(keyword in line_lower for keyword in skip_section_keywords)
 
             # Skip if we're in a section to skip
             if skip_current_section:
                 # Check if we've moved to a new section that we want to keep
-                if line.endswith(':') and not any(keyword in line_lower for keyword in skip_section_keywords):
+                if line.endswith(":") and not any(keyword in line_lower for keyword in skip_section_keywords):
                     skip_current_section = False
                     cleaned_lines.append(line)
                 continue
@@ -104,7 +112,7 @@ class CalfusJobScraper:
                 continue
 
             # Skip lines that are just dates or URLs
-            if re.match(r'^\d{4}-\d{2}-\d{2}', line) or line.startswith('http'):
+            if re.match(r"^\d{4}-\d{2}-\d{2}", line) or line.startswith("http"):
                 continue
 
             cleaned_lines.append(line)
@@ -128,7 +136,7 @@ class CalfusJobScraper:
         while final_lines and not final_lines[-1].strip():
             final_lines.pop()
 
-        return '\n'.join(final_lines)
+        return "\n".join(final_lines)
 
     async def scrape_job_listings(self, page):
         """Scrape all job listings from the main page"""
@@ -175,7 +183,7 @@ class CalfusJobScraper:
             '*:has-text("See Details")',
             '*:has-text("see details")',
             '*:has-text("Apply")',
-            '*:has-text("View")'
+            '*:has-text("View")',
         ]
 
         all_job_elements = []
@@ -194,7 +202,7 @@ class CalfusJobScraper:
 
         # Method 2: Look for job containers by structure
         print("Looking for job containers by structure...")
-        job_containers = await page.query_selector_all('div, section, article')
+        job_containers = await page.query_selector_all("div, section, article")
         potential_job_containers = []
 
         for container in job_containers:
@@ -203,18 +211,13 @@ class CalfusJobScraper:
                 container_text_lower = container_text.lower()
 
                 # Check if container has job-like content
-                job_indicators = [
-                    'see details', 'apply now', 'view job', 'job opening',
-                    'position', 'bengaluru', 'pune', 'mumbai', 'hyderabad',
-                    'years of experience', 'experience', 'skills required'
-                ]
+                job_indicators = ["see details", "apply now", "view job", "job opening", "position", "bengaluru", "pune", "mumbai", "hyderabad", "years of experience", "experience", "skills required"]
 
                 if any(indicator in container_text_lower for indicator in job_indicators):
                     # Check if it's not a navigation or header element
-                    if (not any(nav in container_text_lower for nav in ['navigation', 'menu', 'header', 'footer'])
-                            and len(container_text.strip()) > 50):
+                    if not any(nav in container_text_lower for nav in ["navigation", "menu", "header", "footer"]) and len(container_text.strip()) > 50:
                         potential_job_containers.append(container)
-            except:
+            except Exception:
                 continue
 
         print(f"Found {len(potential_job_containers)} potential job containers")
@@ -229,24 +232,24 @@ class CalfusJobScraper:
                 job_url = ""
 
                 # Try to get URL from the element itself or find a link within it
-                if await element.evaluate('el => el.tagName.toLowerCase()') == 'a':
-                    job_url = await element.get_attribute('href') or ""
+                if await element.evaluate("el => el.tagName.toLowerCase()") == "a":
+                    job_url = await element.get_attribute("href") or ""
                 else:
                     # Look for links within the element
-                    link_element = await element.query_selector('a[href]')
+                    link_element = await element.query_selector("a[href]")
                     if link_element:
-                        job_url = await link_element.get_attribute('href') or ""
+                        job_url = await link_element.get_attribute("href") or ""
 
                 # Skip if no URL found or if it's a duplicate
                 if not job_url or job_url in processed_urls:
                     continue
 
                 # Make URL absolute
-                if job_url.startswith('/'):
+                if job_url.startswith("/"):
                     job_url = self.base_url + job_url
 
                 # Skip if it doesn't look like a job URL
-                if not any(keyword in job_url.lower() for keyword in ['job', 'opening', 'position', 'career']):
+                if not any(keyword in job_url.lower() for keyword in ["job", "opening", "position", "career"]):
                     continue
 
                 processed_urls.add(job_url)
@@ -256,14 +259,11 @@ class CalfusJobScraper:
                 for _ in range(10):  # Try up to 10 parent levels
                     try:
                         element_text = await current_element.inner_text()
-                        lines = [line.strip() for line in element_text.split('\n') if line.strip()]
+                        lines = [line.strip() for line in element_text.split("\n") if line.strip()]
 
                         # Look for job title (usually the first meaningful line)
                         for line in lines:
-                            if (len(line) > 5 and len(line) < 100 and
-                                    not line.lower() in ['see details', 'apply now', 'view job'] and
-                                    not any(keyword in line.lower() for keyword in
-                                            ['current job openings', 'calfus', 'navigation', 'menu'])):
+                            if len(line) > 5 and len(line) < 100 and not line.lower() in ["see details", "apply now", "view job"] and not any(keyword in line.lower() for keyword in ["current job openings", "calfus", "navigation", "menu"]):
                                 if not job_title:
                                     job_title = line
                                     break
@@ -271,16 +271,16 @@ class CalfusJobScraper:
                         # Look for location
                         for line in lines:
                             line_lower = line.lower()
-                            if 'bengaluru' in line_lower or 'bangalore' in line_lower:
+                            if "bengaluru" in line_lower or "bangalore" in line_lower:
                                 location = "Bengaluru"
                                 break
-                            elif 'pune' in line_lower:
+                            elif "pune" in line_lower:
                                 location = "Pune"
                                 break
-                            elif 'mumbai' in line_lower:
+                            elif "mumbai" in line_lower:
                                 location = "Mumbai"
                                 break
-                            elif 'hyderabad' in line_lower:
+                            elif "hyderabad" in line_lower:
                                 location = "Hyderabad"
                                 break
 
@@ -288,12 +288,12 @@ class CalfusJobScraper:
                             break
 
                         # Move to parent element
-                        parent = await current_element.query_selector('..')
+                        parent = await current_element.query_selector("..")
                         if parent:
                             current_element = parent
                         else:
                             break
-                    except:
+                    except Exception:
                         break
 
                 # If still no title found, use a fallback
@@ -303,11 +303,7 @@ class CalfusJobScraper:
                 if not location:
                     location = "Location_TBD"
 
-                jobs.append({
-                    'title': job_title,
-                    'location': location,
-                    'url': job_url
-                })
+                jobs.append({"title": job_title, "location": location, "url": job_url})
                 print(f"Found job {len(jobs)}: {job_title} in {location}")
 
             except Exception as e:
@@ -318,8 +314,8 @@ class CalfusJobScraper:
         seen_urls = set()
         unique_jobs = []
         for job in jobs:
-            if job['url'] not in seen_urls:
-                seen_urls.add(job['url'])
+            if job["url"] not in seen_urls:
+                seen_urls.add(job["url"])
                 unique_jobs.append(job)
 
         print(f"Final count: {len(unique_jobs)} unique jobs found")
@@ -343,7 +339,7 @@ class CalfusJobScraper:
         for attempt in range(max_retries):
             try:
                 print(f"Scraping details for: {job['title']} (attempt {attempt + 1}/{max_retries})")
-                await page.goto(job['url'], wait_until="networkidle", timeout=60000)
+                await page.goto(job["url"], wait_until="networkidle", timeout=60000)
                 await page.wait_for_timeout(3000)
                 break
             except Exception as e:
@@ -355,12 +351,12 @@ class CalfusJobScraper:
                 else:
                     print(f"All attempts failed for {job['title']}")
                     return {
-                        'title': job['title'],
-                        'location': job['location'],
-                        'url': job['url'],
-                        'page_title': 'Error - Connection Failed',
-                        'content': f"Error: Could not connect to job page after {max_retries} attempts",
-                        'scraped_date': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        "title": job["title"],
+                        "location": job["location"],
+                        "url": job["url"],
+                        "page_title": "Error - Connection Failed",
+                        "content": f"Error: Could not connect to job page after {max_retries} attempts",
+                        "scraped_date": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     }
 
         try:
@@ -368,15 +364,7 @@ class CalfusJobScraper:
             page_title = await page.title()
 
             # Try to get the main content
-            content_selectors = [
-                'main',
-                '.main-content',
-                '.content',
-                '.job-description',
-                '.job-details',
-                'article',
-                '.container'
-            ]
+            content_selectors = ["main", ".main-content", ".content", ".job-description", ".job-details", "article", ".container"]
 
             job_content = ""
             for selector in content_selectors:
@@ -389,31 +377,17 @@ class CalfusJobScraper:
 
             # If no good content found, get body text and filter
             if not job_content or len(job_content) < 200:
-                body_text = await page.evaluate('document.body.innerText')
+                body_text = await page.evaluate("document.body.innerText")
                 job_content = body_text
 
             # Clean the content to remove unwanted sections
             cleaned_content = self.clean_job_content(job_content)
 
-            return {
-                'title': job['title'],
-                'location': job['location'],
-                'url': job['url'],
-                'page_title': page_title,
-                'content': cleaned_content,
-                'scraped_date': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            }
+            return {"title": job["title"], "location": job["location"], "url": job["url"], "page_title": page_title, "content": cleaned_content, "scraped_date": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 
         except Exception as e:
             print(f"Error scraping job details for {job['title']}: {e}")
-            return {
-                'title': job['title'],
-                'location': job['location'],
-                'url': job['url'],
-                'page_title': 'Error',
-                'content': f"Error scraping job: {str(e)}",
-                'scraped_date': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            }
+            return {"title": job["title"], "location": job["location"], "url": job["url"], "page_title": "Error", "content": f"Error scraping job: {str(e)}", "scraped_date": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 
     def save_job_as_docx(self, job_data):
         """Save job description as Word document"""
@@ -422,19 +396,19 @@ class CalfusJobScraper:
             doc = Document()
 
             # Add title
-            title = doc.add_heading(job_data['title'], 0)
+            doc.add_heading(job_data["title"], 0)
 
             # Add location
             location_para = doc.add_paragraph()
-            location_para.add_run('Location: ').bold = True
+            location_para.add_run("Location: ").bold = True
             location_para.add_run(f"{job_data['location']}")
 
             # Add job description (cleaned content)
-            doc.add_heading('Job Description', level=1)
+            doc.add_heading("Job Description", level=1)
 
             # Split content into paragraphs and add them
-            if job_data['content']:
-                content_paragraphs = job_data['content'].split('\n')
+            if job_data["content"]:
+                content_paragraphs = job_data["content"].split("\n")
                 current_paragraph = ""
 
                 for line in content_paragraphs:
@@ -469,26 +443,18 @@ class CalfusJobScraper:
 
         async with async_playwright() as p:
             # Launch browser with additional options
-            browser = await p.chromium.launch(
-                headless=False,
-                args=[
-                    '--no-sandbox',
-                    '--disable-dev-shm-usage',
-                    '--disable-web-security',
-                    '--disable-features=VizDisplayCompositor'
-                ]
-            )
+            browser = await p.chromium.launch(headless=False, args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-web-security", "--disable-features=VizDisplayCompositor"])
             context = await browser.new_context(
                 user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                viewport={'width': 1920, 'height': 1080},
+                viewport={"width": 1920, "height": 1080},
                 extra_http_headers={
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                    'Accept-Language': 'en-US,en;q=0.5',
-                    'Accept-Encoding': 'gzip, deflate',
-                    'DNT': '1',
-                    'Connection': 'keep-alive',
-                    'Upgrade-Insecure-Requests': '1'
-                }
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+                    "Accept-Language": "en-US,en;q=0.5",
+                    "Accept-Encoding": "gzip, deflate",
+                    "DNT": "1",
+                    "Connection": "keep-alive",
+                    "Upgrade-Insecure-Requests": "1",
+                },
             )
             page = await context.new_page()
 
@@ -523,7 +489,7 @@ class CalfusJobScraper:
                     job_data = await self.scrape_job_details(page, job)
 
                     # Only save if we got meaningful content
-                    if job_data['content'] and len(job_data['content'].strip()) > 50:
+                    if job_data["content"] and len(job_data["content"].strip()) > 50:
                         self.save_job_as_docx(job_data)
                         successful_scrapes += 1
                     else:
@@ -532,12 +498,12 @@ class CalfusJobScraper:
                     # Add delay between requests
                     await asyncio.sleep(3)
 
-                print(
-                    f"\nCompleted! Successfully scraped {successful_scrapes} out of {len(jobs)} job descriptions to {self.jd_folder}")
+                print(f"\nCompleted! Successfully scraped {successful_scrapes} out of {len(jobs)} job descriptions to {self.jd_folder}")
 
             except Exception as e:
                 print(f"Error during scraping: {e}")
                 import traceback
+
                 traceback.print_exc()
 
             finally:

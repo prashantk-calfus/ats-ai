@@ -1,17 +1,20 @@
+import asyncio
 import json
 import logging
 import os
 import re
 import shutil
+import threading
 from typing import Any, Dict
 
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from apscheduler.schedulers.background import BackgroundScheduler
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from langchain_community.document_loaders import PyMuPDFLoader
 from pydantic import BaseModel
 from starlette import status
-from starlette.responses import JSONResponse, RedirectResponse
+from starlette.responses import RedirectResponse
 
-from ats_ai.agent.jd_parser import create_empty_jd_structure, extract_jd_info
+from ats_ai.agent.jd_parser import extract_jd_info
 
 # ---- Import your agent functions ----
 from ats_ai.agent.llm_agent import (
@@ -19,6 +22,7 @@ from ats_ai.agent.llm_agent import (
     evaluate_resume_against_jd,
     extract_resume_info,
 )
+from ats_ai.scraper import CalfusJobScraper
 
 # ---- Constants ----
 RESUME_UPLOAD_FOLDER = "data/"
@@ -123,7 +127,7 @@ async def list_jds():
 
 @app.post("/save_jd_raw_text/")
 async def save_jd_raw_text(request: JDTextRequest):
-    """Enhanced endpoint with intelligent JD validation - only saves valid JDs"""
+    """Save JD text without validation - always process and save"""
     jd_text = request.jd_text.strip()
     jd_name = request.jd_name.strip()
 
@@ -131,28 +135,21 @@ async def save_jd_raw_text(request: JDTextRequest):
         raise HTTPException(status_code=400, detail="Missing JD text or JD name.")
 
     try:
-        # Use the enhanced extraction function with AI validation
+        # Extract JD info without validation
         jd_structured = extract_jd_info(jd_text)
 
-        # Check if it's a valid JD - extract_jd_info now returns empty structure for invalid text
-        is_valid_jd = bool(jd_structured.get("Job_Title", "").strip() or jd_structured.get("Required_Skills", []) or jd_structured.get("Responsibilities", []))
+        # Always save the JD (no validation check)
+        os.makedirs("jd_json", exist_ok=True)
 
-        if is_valid_jd:
-            # Only save if it's a valid JD
-            os.makedirs("jd_json", exist_ok=True)
+        # Sanitize filename
+        safe_filename = re.sub(r"[^\w\s-]", "", jd_name)
+        safe_filename = re.sub(r"[-\s]+", "_", safe_filename)
+        output_path = os.path.join("jd_json", f"{safe_filename}.json")
 
-            # Sanitize filename
-            safe_filename = re.sub(r"[^\w\s-]", "", jd_name)
-            safe_filename = re.sub(r"[-\s]+", "_", safe_filename)
-            output_path = os.path.join("jd_json", f"{safe_filename}.json")
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(jd_structured, f, indent=2, ensure_ascii=False)
 
-            with open(output_path, "w", encoding="utf-8") as f:
-                json.dump(jd_structured, f, indent=2, ensure_ascii=False)
-
-            return {"status": "success", "message": f"JD saved as {safe_filename}.json", "file": f"{safe_filename}.json", "is_valid_jd": True, "parsed_data": jd_structured, "validation_method": "AI-powered analysis"}
-        else:
-            # Don't save file for invalid JD
-            return {"status": "invalid", "message": "Text is not a valid job description - no file saved", "file": None, "is_valid_jd": False, "parsed_data": {}, "validation_method": "AI-powered analysis"}
+        return {"status": "success", "message": f"JD saved as {safe_filename}.json", "file": f"{safe_filename}.json", "is_valid_jd": True, "parsed_data": jd_structured}  # Always return True since we're not validating
 
     except Exception as e:
         logger.error(f"Error in save_jd_raw_text: {str(e)}")
@@ -174,9 +171,119 @@ async def process_jd_folder():
         raise HTTPException(status_code=500, detail=f"Error processing JD folder: {str(e)}")
 
 
+class JDTempRequest(BaseModel):
+    jd_text: str
+
+
+@app.post("/parse_jd_temp/")
+async def parse_jd_temp(request: JDTempRequest):
+    """
+    Parse JD text temporarily without saving anywhere - purely for temporary evaluation
+    """
+    try:
+        # jd_text = request.get("jd_text", "").strip()
+        jd_text = request.jd_text.strip()
+
+        if not jd_text:
+            raise HTTPException(status_code=400, detail="JD text is required")
+
+        # Parse JD text without any validation or saving
+        jd_structured = extract_jd_info(jd_text)
+
+        # Return parsed data directly - no saving, no validation
+        return {"status": "success", "message": "JD parsed temporarily (not saved)", "parsed_data": jd_structured}
+
+    except Exception as e:
+        logger.error(f"Error in parse_jd_temp: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error parsing JD temporarily: {str(e)}")
+
+
 @app.get("/")
 async def docs():
     return RedirectResponse("/docs")
+
+
+@app.post("/trigger_scraper", status_code=status.HTTP_200_OK)
+async def trigger_scraper():
+    try:
+        # Run in background thread to avoid blocking
+        thread = threading.Thread(target=run_scraper_job)
+        thread.start()
+
+        return {"message": "Scraper job triggered successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to trigger scraper: {e}")
+
+
+def run_scraper_and_convert_job():
+    try:
+        logger.info("Starting scraper and conversion job...")
+
+        # Step 1: Run the scraper
+        scraper = CalfusJobScraper()
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(scraper.run())
+        loop.close()
+
+        logger.info("Scraper completed - now converting JDs to JSON...")
+
+        # Step 2: Automatically convert DOCX files to JSON
+        from ats_ai.agent.jd_parser import process_jd_folder_to_json
+
+        processed_count = process_jd_folder_to_json()
+
+        logger.info(f"Complete job finished: Scraped JDs and converted {processed_count} files to JSON")
+
+    except Exception as e:
+        logger.error(f"Scraper and conversion job failed: {e}")
+
+
+def run_scraper_job():
+    run_scraper_and_convert_job()
+
+
+def start_scheduler():
+    """Initialize and start the background scheduler"""
+    scheduler = BackgroundScheduler()
+
+    # Schedule to run daily at 2:30 AM - now includes automatic JSON conversion
+    scheduler.add_job(run_scraper_and_convert_job, "cron", hour=1, minute=00, id="daily_scraper_and_converter", replace_existing=True)  # Use the enhanced function
+
+    scheduler.start()
+    logger.info("Background scheduler started - scraper + JSON conversion will run daily at 2:30 AM")
+    return scheduler
+
+
+@app.post("/trigger_scraper_with_conversion", status_code=status.HTTP_200_OK)
+async def trigger_scraper_with_conversion():
+    """Manually trigger the scraper job WITH automatic JSON conversion"""
+    try:
+        # Run in background thread to avoid blocking
+        thread = threading.Thread(target=run_scraper_and_convert_job)
+        thread.start()
+
+        return {"message": "Scraper job with automatic JSON conversion triggered successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to trigger scraper with conversion: {e}")
+
+
+# Global scheduler variable
+scheduler = None
+
+
+@app.on_event("startup")
+def startup_event():
+
+    start_scheduler()
+
+
+@app.on_event("shutdown")
+def shutdown_event():
+
+    if scheduler:
+        scheduler.shutdown()
+        logger.info("Background scheduler stopped")
 
 
 # ---- Run ----

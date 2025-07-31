@@ -1,40 +1,33 @@
 JD_EXTRACTION_PROMPT = """
-You are an expert HR analyst AI with the ability to distinguish between valid job descriptions and random text.
+You are an expert HR analyst AI.
 
-TASK 1: First, determine if the provided text is a legitimate job description.
-TASK 2: If it's a valid JD, extract structured information. If not, return empty structure.
-
-VALIDATION CRITERIA for a legitimate job description:
-- Contains job-related terminology and context
-- Has information about role responsibilities, requirements, or qualifications  
-- Mentions skills, experience, education, or job-related details
-- Is substantive enough to be a real job posting (not just greetings, names, or random words)
-- Written in a professional/business context
+Your task is to extract structured information from the provided job description (JD) text. Focus only on what is explicitly or strongly implied in the JD. Do not make assumptions or fabricate information.
 
 CRITICAL RULES:
 1. Respond ONLY in valid JSON. Do NOT include commentary, explanations, or anything outside the JSON object.
-2. If the text is NOT a legitimate job description (e.g., casual messages, random text, greetings, single words), return the empty structure with all arrays as [] and strings as "".
-3. If it IS a legitimate job description, extract the information as specified.
-4. Use the exact structure and keys as specified below.
+2. If a field is missing in the JD, return "NA" or an empty list as appropriate.
+3. Use the exact structure and keys as specified below.
+4. Be comprehensive, but avoid duplication or invented content.
+5. Extract information from ANY text provided - do not validate if it's a proper JD or not.
 
 RETURN FORMAT (strictly follow this):
 {{
-  "is_valid_jd": true/false,
-  "Job_Title": "Job title as mentioned or empty string if invalid",
-  "Required_Skills": ["list of must-have skills, tools, or technologies or empty array if invalid"],
-  "Preferred_Skills": ["list of nice-to-have skills or tools or empty array if invalid"],
-  "Minimum_Experience": "minimum experience required (e.g., '3+ years') or empty string if invalid",
-  "Location": "location mentioned (or 'Remote', 'Hybrid') or empty string if invalid",
-  "Responsibilities": ["key responsibilities extracted as list items or empty array if invalid"],
-  "Qualifications": ["required degrees, certifications, or qualifications or empty array if invalid"],
-  "Domain": "industry/domain (e.g., 'Technology', 'Healthcare') or empty string if invalid"
+  "Job_Title": "Job title as mentioned or inferred from the text",
+  "Required_Skills": ["list of must-have skills, tools, or technologies mentioned"],
+  "Preferred_Skills": ["list of nice-to-have skills or tools mentioned"],
+  "Minimum_Experience": "minimum experience required (e.g., '3+ years') or 'NA'",
+  "Location": "location mentioned (or 'Remote', 'Hybrid', or 'NA')",
+  "Responsibilities": ["key responsibilities extracted as list items"],
+  "Qualifications": ["required degrees, certifications, or qualifications"],
+  "Domain": "industry or domain mentioned or inferred",
+  "Key_considerations_for_hiring": ["list down very important factors detrimental for hiring"]
 }}
 
-
-JD TEXT:
+ JD TEXT:
 \"\"\"
 {jd_text}
 \"\"\"
+
 
 Return only the structured JSON output.
 """.strip()
@@ -238,6 +231,7 @@ EVALUATION_PROMPT = """
     {jd_json}
 """.strip()
 
+
 EVALUATION_AND_PARSING_PROMPT = """
     You are a multi-stage evaluation AI. Your job is to:
 
@@ -290,15 +284,39 @@ EVALUATION_AND_PARSING_PROMPT = """
 
 
     CRITICAL INSTRUCTIONS:
-    1. **Return ONLY VALID JSON.** No explanations, no commentary, no additional text outside the JSON structure.
-    2. **Use the EXACT JSON structure provided below.** Adhere strictly to all keys, data types, and nesting.
-    3. **Handle Missing Information:**
+    1.**PRE-EVALUATION JD VALIDATION:** If the provided 'Job Description' text appears to be a short, generic phrase (e.g., "senior python role", "hi", "random text") and does not contain sufficient detail to constitute a proper job description:
+       * Set "Experience_Score", "Skills_Score", "Projects_Score", "Education_Score" to 0.0.
+       * Set "Overall_Weighted_Score" to 0.0.
+       * Set "Match_Percentage" to "0.0%".
+       * Set "Qualification Status" to "Not Qualified - Invalid Job Description".
+       * Populate "Comments" with "The provided Job Description is too brief or generic for a meaningful evaluation."
+       * For "Skills Match", "Required_Skills_Missing_from_Resume", "Extra skills", "Pros", "Cons", and "Missing_Requirements", return empty arrays `[]`.
+       * **Only proceed with the detailed evaluation and scoring criteria if the Job Description is deemed substantial and valid.**
+       
+     
+    2. **Return ONLY VALID JSON.** No explanations, no commentary, no additional text outside the JSON structure.
+    3. **Use the EXACT JSON structure provided below.** Adhere strictly to all keys, data types, and nesting.
+    4. **Handle Missing Information:**
     * For **single string fields** (e.g., "Name", "Mobile_No", "Github_Repo"), if information is missing, use the string value "NA".
-    * For **lists/arrays** (e.g., "Education", "Professional_Experience", "Projects", "Certifications", "Programming_Language", "Frameworks", "Technologies"), if no relevant entries are found, return an **empty array []**. 
+    * For **lists/arrays** (e.g., "Education", "Professional_Experience", "Projects", "Certifications", "Programming_Language", "Frameworks", "Technologies"), if no relevant entries are found, return an **empty array []**.
       Do not return an object with "NA" values inside an empty array.
-    4. **All JSON keys must be in double quotes.**
-    5. **Be thorough and accurate** - don't invent information that isn't there.
-    6. **Pay special attention to technical skills, programming languages, and frameworks.**
+    5. **All JSON keys must be in double quotes.**
+    6. **Be thorough and accurate** - don't invent information that isn't there.
+    7. **Pay special attention to technical skills, programming languages, and frameworks.**
+    8. **The resume and JD may express skills, tools, and frameworks differently.** Do not expect exact word matches.**
+    9. **Use reasoning and industry knowledge to infer relationships between tools and core skills.** Examples:
+       * If the JD asks for **"Python"**, and the resume includes **"FastAPI"** or **"LangChain"**, infer the candidate likely knows Python.
+       * If the JD requires **"DevOps"**, and the resume lists tools like **"Terraform"**, **"GitHub Actions"**, or **"CI/CD pipelines"**, consider it aligned.
+       * If the JD mentions **"Cloud Platforms"**, and the resume includes **"AWS"**, **"GCP"**, or **"Azure"**, treat it as a match.**
+    10. **Avoid marking a skill as "missing" if it is clearly demonstrated or implied through tools, frameworks, or project context.**
+    11.**You must reason about technical synonymy.** Related tools or domains should contribute toward skills match, even if not worded identically.
+    12.**Award partial or full credit for implied or demonstrated knowledge** based on:
+       * Tools used in projects
+       * Responsibilities or achievements
+       * Specific technologies mentioned in context**
+    13.**Recognize synonyms and related technologies** (e.g., "Flask" relates to Python; "Kubernetes" relates to DevOps/cloud).
+   14.**Only report a skill as missing if it's listed in the JD's Required_Skills but has no clear evidence in the resume. Do not evaluate skills not mentioned in the JD.**
+    15.**CRITICAL: Base your evaluation ONLY on the skills listed in the job description. Ignore any resume skills that are not mentioned in the JD's requirements.**
 
     "Evaluation" must contain the following fields:
 
@@ -319,12 +337,14 @@ EVALUATION_AND_PARSING_PROMPT = """
           "bullet point 2"
         ],
         "Skills Match": [
-            "List specific skills explicitly mentioned in JD and found/used in resume (e.g., 'Node.js: used in API Gateway development, Enphase Energy')",
-            "List quantifiable outcomes tied to skills where possible (e.g., 'BiLSTM: achieved 92% accuracy in Phonocardiogram Project')"
+            "ONLY list skills that are present in the JD's Required_Skills or Preferred_Skills arrays AND found in the resume",
+            "For each matched skill, explain how it's demonstrated in the resume",
+            "Do NOT include skills that are not mentioned in the job description"
         ],
         "Required_Skills_Missing_from_Resume": [
-            "List REQUIRED skills from JD that are absent or not demonstrated in the resume"
+          "List only JD-required skills that are not explicitly or implicitly shown in the resume. Do NOT list skills as missing if they are implied through related tools, frameworks, or project experience."
         ],
+
         "Extra skills": [
             "List additional skills candidate has beyond job requirements (for context, do not factor into main scores)"
         ],
@@ -380,41 +400,67 @@ EVALUATION_AND_PARSING_PROMPT = """
 """.strip()
 
 
-
-JD_VALIDATION_AND_EXTRACTION_PROMPT = """
-You are an AI assistant that analyzes text to determine if it's a valid job description and extracts structured information.
-
-First, analyze if the following text is a legitimate job description or just random text/greeting/name.
-
-Text to analyze:
-{{JD_TEXT}}
-
-If this is NOT a valid job description (like "see u", "hello", random text, just a name, etc.), respond with:
-{
-    "is_valid_jd": false,
-    "Job_Title": "",
-    "Required_Skills": [],
-    "Preferred_Skills": [],
-    "Minimum_Experience": "",
-    "Location": "",
-    "Responsibilities": [],
-    "Qualifications": [],
-    "Domain": ""
-}
-
-If this IS a valid job description, extract and structure the information as JSON:
-{
-    "is_valid_jd": true,
-    "Job_Title": "extracted job title",
-    "Required_Skills": ["skill1", "skill2"],
-    "Preferred_Skills": ["skill1", "skill2"],
-    "Minimum_Experience": "X years",
-    "Location": "location",
-    "Responsibilities": ["responsibility1", "responsibility2"],
-    "Qualifications": ["qualification1", "qualification2"],
-    "Domain": "domain/industry"
-}
-
-Respond ONLY with valid JSON, no additional text.
-"""
-
+# JD_VALIDATION_AND_EXTRACTION_PROMPT = """
+# You are an expert AI assistant specialized in analyzing and extracting structured information from job descriptions.
+#
+# **TASK**: Perform a comprehensive step-by-step analysis to determine if the given text is a legitimate job description, then extract structured information accordingly.
+#
+# **STEP-BY-STEP ANALYSIS PROCESS**:
+#
+# **STEP 1: Content Analysis**
+# - Examine the text length, structure, and overall coherence
+# - Identify if the text contains professional, business-oriented language
+# - Check for presence of job-related terminology and context
+#
+# **STEP 2: Job Description Indicators Assessment**
+# Analyze for the presence of these key indicators:
+# - Job titles, roles, or position names
+# - Skills, technologies, or competencies mentioned
+# - Experience requirements or career level indicators
+# - Responsibilities, duties, or task descriptions
+# - Qualifications, education, or certification requirements
+# - Company context, industry domain, or work environment details
+# - Employment conditions (salary, benefits, location, work type)
+#
+# **STEP 3: Content Quality Evaluation**
+# - Assess if the content is substantive enough for a real job posting
+# - Verify the text maintains professional tone throughout
+# - Check if information flows logically as a job description would
+#
+# **STEP 4: Validation Decision**
+# Based on your analysis, determine:
+# - Does this text represent a legitimate job description that would be posted by an employer?
+# - Is there sufficient job-related information to warrant extraction?
+# - Would a job seeker find this content useful for understanding a role?
+#
+# **STEP 5: Information Extraction** (Only if validated as legitimate JD)
+# If the text passes validation, extract the following structured information:
+# - Job_Title: The primary role/position title
+# - Required_Skills: Essential/mandatory skills, technologies, or competencies
+# - Preferred_Skills: Nice-to-have or preferred skills and technologies
+# - Minimum_Experience: Required years of experience or experience level
+# - Location: Work location, remote/hybrid options, or geographic requirements
+# - Responsibilities: Key duties, tasks, and accountabilities
+# - Qualifications: Educational requirements, certifications, or credentials
+# - Domain: Industry sector, business domain, or field of work
+#
+# **OUTPUT REQUIREMENTS**:
+# - Respond ONLY with valid JSON in the exact format specified below
+# - No explanations, commentary, or additional text outside the JSON structure
+# - Use your analytical reasoning to make informed extraction decisions
+#
+# **TEXT TO ANALYZE**:
+# {{JD_TEXT}}
+#
+#
+#
+# **EXTRACTION GUIDELINES**:
+# - Be thorough but precise in your extraction
+# - Distinguish between required vs preferred skills based on language cues
+# - Extract specific responsibilities rather than generic statements
+# - Identify the most appropriate industry domain based on context
+# - Use "Not specified" for fields that are typically present in JDs but missing in this text
+# - Ensure arrays contain meaningful, distinct items rather than redundant entries
+#
+# Return ONLY the JSON structure with no additional text.
+# """

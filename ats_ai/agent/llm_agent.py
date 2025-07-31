@@ -56,7 +56,7 @@ def load_pdf_text(file_path: str) -> str:
 
 def extract_json_block(text: str) -> dict:
     # Find JSON-like object
-    match = re.search(r'\{[\s\S]*\}', text)
+    match = re.search(r"\{[\s\S]*\}", text)
     if not match:
         raise json.JSONDecodeError("No JSON object found", text, 0)
 

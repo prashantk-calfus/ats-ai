@@ -3,30 +3,35 @@ import logging
 import os
 from pathlib import Path
 
+import mammoth
+from dotenv import load_dotenv
+from google import genai
 from langchain_community.document_loaders import PyMuPDFLoader
-from langchain_community.llms import Ollama
+
 from ats_ai.agent.llm_agent import extract_json_block
 from ats_ai.agent.prompts import JD_EXTRACTION_PROMPT
-from ats_ai.agent.prompts import JD_VALIDATION_AND_EXTRACTION_PROMPT
-
-import mammoth
 
 logger = logging.getLogger(__name__)
 
-def create_empty_jd_structure() -> dict:
-    """Create an empty JD structure for invalid inputs"""
-    return {
-        "is_valid_jd": False,
-        "Job_Title": "",
-        "Required_Skills": [],
-        "Preferred_Skills": [],
-        "Minimum_Experience": "",
-        "Location": "",
-        "Responsibilities": [],
-        "Qualifications": [],
-        "Domain": ""
-    }
+load_dotenv()
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
+gemini_model = genai.Client()
+
+
+def create_empty_jd_structure() -> dict:
+    """Create a default JD structure with meaningful defaults instead of empty values"""
+    return {
+        "Job_Title": "Position Available",
+        "Required_Skills": ["To be determined"],
+        "Preferred_Skills": [],
+        "Minimum_Experience": "NA",
+        "Location": "NA",
+        "Responsibilities": ["To be determined"],
+        "Qualifications": [],
+        "Domain": "General",
+        "Key_considerations_for_hiring": [],
+    }
 
 
 def load_pdf_text(file_path: str) -> str:
@@ -36,51 +41,58 @@ def load_pdf_text(file_path: str) -> str:
 
 
 def extract_jd_info(jd_text: str) -> dict:
-    """
-    Enhanced function that validates if text is a JD and extracts info accordingly.
-    Uses LLM intelligence instead of hardcoded keywords.
-    """
+
     try:
-        # Initialize the LLM
-        llm = Ollama(model="llama3.1:8b")
+        # Create the prompt
+        prompt = JD_EXTRACTION_PROMPT.format(jd_text=jd_text.strip())
 
-        # Create the enhanced prompt with validation
-        prompt = JD_VALIDATION_AND_EXTRACTION_PROMPT.replace("{{JD_TEXT}}", jd_text.strip())
+        # Get response from Gemini
+        response = gemini_model.models.generate_content(model="gemini-2.0-flash", contents=prompt)
+        raw_response = response.text.strip()
 
-        # Get response from LLM
-        response = llm.invoke(prompt).strip()
-        logger.info(f"Raw JD Validation Output:\n{response}")
+        logger.info(f"Raw JD Extraction Output:\n{raw_response}")
 
         # Extract and parse JSON
-        parsed_response = extract_json_block(response)
+        parsed_response = extract_json_block(raw_response)
 
-        # Check if LLM determined this is a valid JD
-        is_valid = parsed_response.get("is_valid_jd", False)
+        # Ensure all required fields exist with default values if missing
+        default_structure = {"Job_Title": "NA", "Required_Skills": [], "Preferred_Skills": [], "Minimum_Experience": "NA", "Location": "NA", "Responsibilities": [], "Qualifications": [], "Domain": "NA", "Key_considerations_for_hiring": []}
 
-        if not is_valid:
-            logger.info("LLM determined text is not a valid job description")
-            return create_empty_jd_structure()
-
-        # Remove the validation flag from the final output to match your expected format
-        final_response = {k: v for k, v in parsed_response.items() if k != "is_valid_jd"}
-
+        # Merge with defaults to ensure no missing fields
+        final_response = {**default_structure, **parsed_response}
+        print(final_response)
         logger.info("Successfully extracted JD information")
         return final_response
 
     except json.JSONDecodeError as e:
         logger.error(f"Failed to parse JD JSON: {e}")
-        logger.error(f"Raw response: {response}")
-        return create_empty_jd_structure()
+        logger.error(f"Raw response: {raw_response}")
+        # Return default structure instead of empty
+        return {
+            "Job_Title": "Extracted from Text",
+            "Required_Skills": ["To be determined"],
+            "Preferred_Skills": [],
+            "Minimum_Experience": "NA",
+            "Location": "NA",
+            "Responsibilities": ["To be determined"],
+            "Qualifications": [],
+            "Domain": "General",
+            "Key_considerations_for_hiring": [],
+        }
     except Exception as e:
         logger.error(f"Error in extract_jd_info: {e}")
-        return create_empty_jd_structure()
-
-
-def save_json(data: dict, output_path: str):
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    with open(output_path, "w") as f:
-        json.dump(data, f, indent=2)
-    print(f"Structured JD saved to: {output_path}")
+        # Return default structure instead of empty
+        return {
+            "Job_Title": "Extracted from Text",
+            "Required_Skills": ["To be determined"],
+            "Preferred_Skills": [],
+            "Minimum_Experience": "NA",
+            "Location": "NA",
+            "Responsibilities": ["To be determined"],
+            "Qualifications": [],
+            "Domain": "General",
+            "Key_considerations_for_hiring": [],
+        }
 
 
 def load_docx_text(file_path: str) -> str:
@@ -98,17 +110,23 @@ def load_document_text(file_path: str) -> str:
     """Universal document loader for PDF, DOC, DOCX"""
     file_extension = Path(file_path).suffix.lower()
 
-
-    if file_extension == '.docx':
+    if file_extension == ".docx":
         return load_docx_text(file_path)
 
     else:
         raise ValueError(f"Unsupported file format: {file_extension}")
 
 
+def save_json(data: dict, output_path: str):
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    with open(output_path, "w") as f:
+        json.dump(data, f, indent=2)
+    print(f"Structured JD saved to: {output_path}")
+
+
 def process_jd_folder_to_json():
     """
-    NEW FUNCTION: Process all DOC/DOCX files in jd_folder and convert to JSON
+    Process all DOC/DOCX files in jd_folder and convert to JSON
     """
     jd_folder = Path("jd_folder")
     jd_json_folder = Path("jd_json")
@@ -118,10 +136,10 @@ def process_jd_folder_to_json():
 
     if not jd_folder.exists():
         logger.warning("jd_folder does not exist")
-        return
+        return 0
 
     # Process all DOC/DOCX files
-    supported_extensions = ['.doc', '.docx', '.pdf']
+    supported_extensions = [".doc", ".docx", ".pdf"]
     processed_count = 0
 
     for file_path in jd_folder.iterdir():
@@ -136,29 +154,19 @@ def process_jd_folder_to_json():
                     logger.warning(f"No text extracted from {file_path.name}")
                     continue
 
-                # Extract JD info using LLM
+                # Extract JD info using LLM (without validation)
                 jd_structured = extract_jd_info(jd_text)
 
-                # Check if it's a valid JD
-                is_valid_jd = bool(
-                    jd_structured.get("Job_Title", "").strip() or
-                    jd_structured.get("Required_Skills", []) or
-                    jd_structured.get("Responsibilities", [])
-                )
+                # Always save the result (no validation check)
+                json_filename = file_path.stem + ".json"
+                json_path = jd_json_folder / json_filename
 
-                if is_valid_jd:
-                    # Create JSON filename
-                    json_filename = file_path.stem + ".json"
-                    json_path = jd_json_folder / json_filename
+                # Save JSON
+                with open(json_path, "w", encoding="utf-8") as f:
+                    json.dump(jd_structured, f, indent=2, ensure_ascii=False)
 
-                    # Save JSON
-                    with open(json_path, "w", encoding='utf-8') as f:
-                        json.dump(jd_structured, f, indent=2, ensure_ascii=False)
-
-                    logger.info(f"✅ Saved: {json_filename}")
-                    processed_count += 1
-                else:
-                    logger.warning(f"❌ Invalid JD: {file_path.name}")
+                logger.info(f"✅ Saved: {json_filename}")
+                processed_count += 1
 
             except Exception as e:
                 logger.error(f"Error processing {file_path.name}: {e}")
@@ -180,7 +188,7 @@ if __name__ == "__main__":
         print("Extracting structured JD info...")
         jd_structured = extract_jd_info(jd_text)
 
-        if jd_structured and jd_structured.get("Job_Title"):
+        if jd_structured:
             save_json(jd_structured, output_json_path)
         else:
-            print("No valid JD content found in the PDF")
+            print("No JD content found in the PDF")
