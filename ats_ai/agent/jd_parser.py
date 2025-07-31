@@ -60,7 +60,7 @@ def extract_jd_info(jd_text: str) -> dict:
 
         # Merge with defaults to ensure no missing fields
         final_response = {**default_structure, **parsed_response}
-        print(final_response)
+
         logger.info("Successfully extracted JD information")
         return final_response
 

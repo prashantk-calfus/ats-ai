@@ -7,11 +7,7 @@ from google import genai
 from langchain_community.document_loaders import PyMuPDFLoader
 from pydantic import BaseModel
 
-from ats_ai.agent.prompts import (
-    EVALUATION_AND_PARSING_PROMPT,
-    EVALUATION_PROMPT,
-    RESUME_PARSE_PROMPT,
-)
+from ats_ai.agent.prompts import EVALUATION_AND_PARSING_PROMPT, RESUME_PARSE_PROMPT
 
 """
     Using LLM chaining workflow to parse, evaluate, and validate resume and given job description
@@ -75,15 +71,15 @@ async def extract_resume_info(raw_resume_text: str):
     return extract_json_block(response.text)
 
 
-async def evaluate_resume_against_jd(jd_json: dict, resume_data: dict):
-    """
-    Evaluation Agent LLM.
-    Evaluate parsed information from resume from JD
-    """
-    prompt = EVALUATION_PROMPT.format(resume_data=resume_data, jd_json=jd_json)
-    response = gemini_model.models.generate_content(model="gemini-2.0-flash", contents=prompt)
-
-    return extract_json_block(response.text)
+# async def evaluate_resume_against_jd(jd_json: dict, resume_data: dict):
+#     """
+#     Evaluation Agent LLM.
+#     Evaluate parsed information from resume from JD
+#     """
+#     prompt = EVALUATION_PROMPT.format(resume_data=resume_data, jd_json=jd_json)
+#     response = gemini_model.models.generate_content(model="gemini-2.0-flash", contents=prompt)
+#
+#     return extract_json_block(response.text)
 
 
 async def combined_parse_evaluate(resume_data: str, job_description: str):
