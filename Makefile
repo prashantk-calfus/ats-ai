@@ -40,6 +40,8 @@ make_env:
 	else \
 		echo "Virtual environment already exists."; \
 	fi
+	@echo "Creating .logs directory if not exists..."
+	@mkdir -p .logs
 	@echo "Activating venv and installing Poetry if missing..."
 	. $(VENV_DIR)/bin/activate && make install_poetry
 
