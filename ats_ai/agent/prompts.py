@@ -32,81 +32,6 @@ RETURN FORMAT (strictly follow this):
 Return only the structured JSON output.
 """.strip()
 
-RESUME_PARSE_PROMPT = """
-        You are an expert resume parser in HR and recruitment. Your task is to extract structured information from resume text.
-
-        CRITICAL INSTRUCTIONS:
-        1. **Return ONLY VALID JSON.** No explanations, no commentary, no additional text outside the JSON structure.
-        2. **Use the EXACT JSON structure provided below.** Adhere strictly to all keys, data types, and nesting.
-        3. **Handle Missing Information:**
-        * For **single string fields** (e.g., "Name", "Mobile_No", "Github_Repo"), if information is missing, use the string value "NA".
-        * For **lists/arrays** (e.g., "Education", "Professional_Experience", "Projects", "Certifications", "Programming_Language", "Frameworks", "Technologies"), if no relevant entries are found, return an **empty array []**. 
-          Do not return an object with "NA" values inside an empty array.
-        4. **All JSON keys must be in double quotes.**
-        5. **Be thorough and accurate** - don't invent information that isn't there.
-        6. **Pay special attention to technical skills, programming languages, and frameworks.**
-
-        REQUIRED JSON STRUCTURE (use exactly this format):
-        {{
-          "Name": "candidate full name",
-          "Contact_Details": {{
-            "Mobile_No": "phone number",
-            "Email": "email address"
-          }},
-          "Github_Repo": "github profile url, use NA if not provided",
-          "LinkedIn": "linkedin profile url, use NA if not provided",
-          "Education": [
-            {{
-              "Degree": "degree name and field of study",
-              "Institution": "university/college name",
-              "Score": "GPA/percentage/grade",
-              "Duration": "study period or graduation year"
-            }}
-            // Add more education entries as separate objects if present.
-          ],
-          "Professional_Experience": [
-            {{
-              "Company": "company name",
-              "Role": "job title/position",
-              "Duration": "employment period",
-              "Description": "summarize in 2-3 sentences key responsibilities and achievements"
-            }}
-            // Add more professional experience entries as separate objects if present.
-          ],
-          "Projects": [
-            {{
-              "Project_Name": "project title",
-              "Project_Description": "brief description including technologies used"
-            }}
-            // Add more project entries as separate objects if present.
-          ],
-          "Certifications": [
-            {{
-              "Certification_Authority": "issuing organization",
-              "Certification_Details": "certification name and details"
-            }}
-            // Add more certification entries as separate objects if present.
-          ],
-          "Programming_Language": ["list all programming languages mentioned"],
-          "Frameworks": ["list all frameworks, libraries, and significant tools (e.g., React, Express, Pandas, NumPy, Bootstrap, Spring Boot)"],
-          "Technologies": ["list all underlying technologies, platforms, and databases (e.g., AWS, Azure, Docker, Kubernetes, SQL, MongoDB, Git, Jenkins, Tableau, Salesforce, SharePoint)"]
-        }}
-
-        EXTRACTION GUIDELINES:
-        - Look carefully for **contact information** (phone, email, GitHub, LinkedIn).
-        - Extract **ALL educational qualifications**.
-        - Include **ALL work experience, internships, and relevant positions**.
-        - Capture **ALL projects** (personal, academic, professional).
-        - List **ALL technical skills**, ensuring proper categorization into Programming_Language, Frameworks, or Technologies.
-        - Be comprehensive but **do not duplicate information**.
-        - **Order of Lists:** For 'Education', 'Professional_Experience', and 'Projects', list all entries in **reverse chronological order** (most recent first).
-        - **Description Conciseness:** Summarize 'Professional_Experience' descriptions concisely, aiming for 2-3 sentences to highlight key responsibilities and quantifiable achievements.
-
-        RESUME TEXT TO PARSE:
-        {raw_resume_text}
-
-        Return ONLY the JSON structure:
-""".strip()
 
 EVALUATION_PROMPT = """
     You are a **highly experienced Senior HR Professional and Technical Recruiter** with 15+ years of experience in technical hiring. 
@@ -232,6 +157,85 @@ EVALUATION_PROMPT = """
 """.strip()
 
 
+RESUME_PARSE_PROMPT = """
+        You are an expert resume parser in HR and recruitment. Your task is to extract structured information from resume text.
+
+        CRITICAL INSTRUCTIONS:
+        1. **Return ONLY VALID JSON.** No explanations, no commentary, no additional text outside the JSON structure.
+        2. **Use the EXACT JSON structure provided below.** Adhere strictly to all keys, data types, and nesting.
+        3. **Handle Missing Information:**
+        * For **single string fields** (e.g., "Name", "Mobile_No", "Github_Repo"), if information is missing, use the string value "NA".
+        * For **lists/arrays** (e.g., "Education", "Professional_Experience", "Projects", "Certifications", "Programming_Language", "Frameworks", "Technologies"), if no relevant entries are found, return an **empty array []**. 
+          Do not return an object with "NA" values inside an empty array.
+        4. **All JSON keys must be in double quotes.**
+        5. **Be thorough and accurate** - don't invent information that isn't there.
+        6. **Pay special attention to technical skills, programming languages, and frameworks.**
+
+        REQUIRED JSON STRUCTURE (use exactly this format):
+        {{
+          "Name": "candidate full name",
+          "Contact_Details": {{
+            "Mobile_No": "phone number",
+            "Email": "email address"
+          }},
+          "Github_Repo": "github profile url, use NA if not provided",
+          "LinkedIn": "linkedin profile url, use NA if not provided",
+          "Education": [
+            {{
+              "Degree": "degree name and field of study",
+              "Institution": "university/college name",
+              "Score": "GPA/percentage/grade",
+              "Duration": "study period or graduation year"
+            }}
+            // Add more education entries as separate objects if present.
+          ],
+          "Professional_Experience": [
+            {{
+              "Company": "company name",
+              "Role": "job title/position",
+              "Duration": "employment period",
+              "Description": "summarize in 2-3 sentences key responsibilities and achievements"
+            }}
+            // Add more professional experience entries as separate objects if present.
+          ],
+        "Projects": [
+          {
+            "Title": "project name or NA if no projects",
+            "Description": "summary of the project or NA if no projects", 
+            "Technologies": ["Python", "React", ...] // empty array if no projects
+          }
+        ],
+            // Add more project entries as separate objects if present.
+          ],
+          "Certifications": [
+            {{
+              "Certification_Authority": "issuing organization",
+              "Certification_Details": "certification name and details"
+            }}
+            // Add more certification entries as separate objects if present.
+          ],
+          "Programming_Language": ["list all programming languages mentioned"],
+          "Frameworks": ["list all frameworks, libraries, and significant tools (e.g., React, Express, Pandas, NumPy, Bootstrap, Spring Boot)"],
+          "Technologies": ["list all underlying technologies, platforms, and databases (e.g., AWS, Azure, Docker, Kubernetes, SQL, MongoDB, Git, Jenkins, Tableau, Salesforce, SharePoint)"]
+        }}
+
+        EXTRACTION GUIDELINES:
+        - Look carefully for **contact information** (phone, email, GitHub, LinkedIn).
+        - Extract **ALL educational qualifications**.
+        - Include **ALL work experience, internships, and relevant positions**.
+        - Capture **ALL projects** (personal, academic, professional).
+        - List **ALL technical skills**, ensuring proper categorization into Programming_Language, Frameworks, or Technologies.
+        - Be comprehensive but **do not duplicate information**.
+        - **Order of Lists:** For 'Education', 'Professional_Experience', and 'Projects', list all entries in **reverse chronological order** (most recent first).
+        - **Description Conciseness:** Summarize 'Professional_Experience' descriptions concisely, aiming for 2-3 sentences to highlight key responsibilities and quantifiable achievements.
+
+        RESUME TEXT TO PARSE:
+        {raw_resume_text}
+
+        Return ONLY the JSON structure:
+""".strip()
+
+
 EVALUATION_AND_PARSING_PROMPT = """
     You are a multi-stage evaluation AI. Your job is to:
 
@@ -241,6 +245,19 @@ EVALUATION_AND_PARSING_PROMPT = """
     **SCORING CRITERIA (Apply ONLY if JD is Valid):**
 
     Scores are on a scale of 0-10. The Overall_Weighted_Score will be a calculated float.
+
+    **DYNAMIC WEIGHT CALCULATION:**
+    - If Projects section is empty or contains only "NA" entries, redistribute the 20% weight to other sections:
+      * Experience Score: 40% (instead of 30%)
+      * Skills Score: 50% (instead of 40%) 
+      * Education Score: 10% (remains same)
+      * Projects Score: 0% (excluded from calculation)
+    
+    - If Projects section has valid entries, use standard weights:
+      * Experience Score: 30%
+      * Skills Score: 40%
+      * Projects Score: 20%
+      * Education Score: 10%
 
     * **Experience Score (Weight: 30%)**
     * **Years of Experience:** Directly compare against JD's requirement. Penalize heavily if minimum is not met.
@@ -274,14 +291,20 @@ EVALUATION_AND_PARSING_PROMPT = """
 
     **CALCULATIONS (Perform ONLY if JD is Valid):**
 
-    * Overall_Weighted_Score = (Experience_Score * 0.3) + (Skills_Score * 0.4) + (Projects_Score * 0.2) + (Education_Score * 0.1)
+    * **Check if Projects section is valid:**
+   * If Projects array is empty OR contains only entries where Project_Name/Title is "NA" or similar, exclude projects from scoring
+   * Set Projects_Score to 0.0 and use redistributed weights
+
+    * **Weight Distribution:**
+    * WITH Projects: Overall_Weighted_Score = (Experience_Score * 0.3) + (Skills_Score * 0.4) + (Projects_Score * 0.2) + (Education_Score * 0.1)
+    * WITHOUT Projects: Overall_Weighted_Score = (Experience_Score * 0.4) + (Skills_Score * 0.5) + (Education_Score * 0.1)
+     
     * All scores (0-10) should be floats for this calculation.
     * Round the final Overall_Weighted_Score to **one decimal place**.
     * Match_Percentage: How much of the JD is covered by the resume. Format as a string with one decimal place and a "%" sign.
     * Qualification_Status:
     * "Qualified" IF Overall_Weighted_Score >= 7.0 AND Match_Percentage (as a numerical value, e.g., 70.0) >= 70.0.
     * "Not Qualified - [Specific Reason]" (e.g., "Skill Gaps", "Insufficient Experience", "Lack of Project Application"). If multiple reasons, pick the most significant.
-
 
     CRITICAL INSTRUCTIONS:
     1.**PRE-EVALUATION JD VALIDATION:** If the provided 'Job Description' text appears to be a short, generic phrase (e.g., "senior python role", "hi", "random text") and does not contain sufficient detail to constitute a proper job description:
@@ -292,8 +315,8 @@ EVALUATION_AND_PARSING_PROMPT = """
        * Populate "Comments" with "The provided Job Description is too brief or generic for a meaningful evaluation."
        * For "Skills Match", "Required_Skills_Missing_from_Resume", "Extra skills", "Pros", "Cons", and "Missing_Requirements", return empty arrays `[]`.
        * **Only proceed with the detailed evaluation and scoring criteria if the Job Description is deemed substantial and valid.**
-       
-     
+
+
     2. **Return ONLY VALID JSON.** No explanations, no commentary, no additional text outside the JSON structure.
     3. **Use the EXACT JSON structure provided below.** Adhere strictly to all keys, data types, and nesting.
     4. **Handle Missing Information:**
@@ -398,69 +421,3 @@ EVALUATION_AND_PARSING_PROMPT = """
     Job Description: {job_description}
 
 """.strip()
-
-
-# JD_VALIDATION_AND_EXTRACTION_PROMPT = """
-# You are an expert AI assistant specialized in analyzing and extracting structured information from job descriptions.
-#
-# **TASK**: Perform a comprehensive step-by-step analysis to determine if the given text is a legitimate job description, then extract structured information accordingly.
-#
-# **STEP-BY-STEP ANALYSIS PROCESS**:
-#
-# **STEP 1: Content Analysis**
-# - Examine the text length, structure, and overall coherence
-# - Identify if the text contains professional, business-oriented language
-# - Check for presence of job-related terminology and context
-#
-# **STEP 2: Job Description Indicators Assessment**
-# Analyze for the presence of these key indicators:
-# - Job titles, roles, or position names
-# - Skills, technologies, or competencies mentioned
-# - Experience requirements or career level indicators
-# - Responsibilities, duties, or task descriptions
-# - Qualifications, education, or certification requirements
-# - Company context, industry domain, or work environment details
-# - Employment conditions (salary, benefits, location, work type)
-#
-# **STEP 3: Content Quality Evaluation**
-# - Assess if the content is substantive enough for a real job posting
-# - Verify the text maintains professional tone throughout
-# - Check if information flows logically as a job description would
-#
-# **STEP 4: Validation Decision**
-# Based on your analysis, determine:
-# - Does this text represent a legitimate job description that would be posted by an employer?
-# - Is there sufficient job-related information to warrant extraction?
-# - Would a job seeker find this content useful for understanding a role?
-#
-# **STEP 5: Information Extraction** (Only if validated as legitimate JD)
-# If the text passes validation, extract the following structured information:
-# - Job_Title: The primary role/position title
-# - Required_Skills: Essential/mandatory skills, technologies, or competencies
-# - Preferred_Skills: Nice-to-have or preferred skills and technologies
-# - Minimum_Experience: Required years of experience or experience level
-# - Location: Work location, remote/hybrid options, or geographic requirements
-# - Responsibilities: Key duties, tasks, and accountabilities
-# - Qualifications: Educational requirements, certifications, or credentials
-# - Domain: Industry sector, business domain, or field of work
-#
-# **OUTPUT REQUIREMENTS**:
-# - Respond ONLY with valid JSON in the exact format specified below
-# - No explanations, commentary, or additional text outside the JSON structure
-# - Use your analytical reasoning to make informed extraction decisions
-#
-# **TEXT TO ANALYZE**:
-# {{JD_TEXT}}
-#
-#
-#
-# **EXTRACTION GUIDELINES**:
-# - Be thorough but precise in your extraction
-# - Distinguish between required vs preferred skills based on language cues
-# - Extract specific responsibilities rather than generic statements
-# - Identify the most appropriate industry domain based on context
-# - Use "Not specified" for fields that are typically present in JDs but missing in this text
-# - Ensure arrays contain meaningful, distinct items rather than redundant entries
-#
-# Return ONLY the JSON structure with no additional text.
-# """

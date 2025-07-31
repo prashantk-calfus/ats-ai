@@ -338,16 +338,30 @@ if st.session_state.parsed_data_combined:
     st.markdown("---")
     st.subheader("📈 Detailed Scores")
 
-    col_ind_score1, col_ind_score2, col_ind_score3, col_ind_score4 = st.columns(4)
-    with col_ind_score1:
-        st.metric(label="Experience Score (0-10)", value=exp_score)
-    with col_ind_score2:
-        st.metric(label="Skills Score (0-10)", value=skill_score)
-    with col_ind_score3:
-        st.metric(label="Education Score (0-10)", value=edu_score)
-    with col_ind_score4:
-        st.metric(label="Projects Score (0-10)", value=projects_score)
+    # Check if projects were excluded from scoring
+    projects_score = eval_results.get("Projects_Score", 0)
+    projects_excluded = projects_score == 0.0
 
+    if projects_excluded:
+        st.info("ℹ️ Projects section was excluded from scoring due to insufficient project information. Weights redistributed to other sections.")
+
+        col_ind_score1, col_ind_score2, col_ind_score3 = st.columns(3)
+        with col_ind_score1:
+            st.metric(label="Experience Score (40%)", value=exp_score)
+        with col_ind_score2:
+            st.metric(label="Skills Score (50%)", value=skill_score)
+        with col_ind_score3:
+            st.metric(label="Education Score (10%)", value=edu_score)
+    else:
+        col_ind_score1, col_ind_score2, col_ind_score3, col_ind_score4 = st.columns(4)
+        with col_ind_score1:
+            st.metric(label="Experience Score (30%)", value=exp_score)
+        with col_ind_score2:
+            st.metric(label="Skills Score (40%)", value=skill_score)
+        with col_ind_score3:
+            st.metric(label="Education Score (10%)", value=edu_score)
+        with col_ind_score4:
+            st.metric(label="Projects Score (20%)", value=projects_score)
     st.markdown("---")
     st.subheader("💪 Strengths and Areas for Improvement")
 
@@ -463,14 +477,26 @@ if st.session_state.parsed_data_combined:
             st.markdown("---")
             st.markdown("#### 🚀 Projects")
             project_entries = parsed_resume_data.get("Projects", [])
-            if project_entries and project_entries[0].get("Project_Name", "NA").upper() not in ["NA", "N/A"]:
+
+            # Check if projects are meaningful or just NA placeholders
+            has_valid_projects = False
+            if project_entries:
                 for proj in project_entries:
-                    st.markdown(f"**Project Name:** {proj.get('Project_Name', 'N/A')}")
-                    description = proj.get("Project_Description", "N/A")
-                    if description and description.strip().lower() not in ["na", "n/a"]:
-                        st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;*Description:* {description}")
+                    project_name = proj.get("Project_Name", proj.get("Title", "")).strip()
+                    if project_name and project_name.upper() not in ["NA", "N/A", ""]:
+                        has_valid_projects = True
+                        break
+
+            if has_valid_projects:
+                for proj in project_entries:
+                    project_name = proj.get("Project_Name", proj.get("Title", "N/A"))
+                    if project_name.upper() not in ["NA", "N/A"]:
+                        st.markdown(f"**Project Name:** {project_name}")
+                        description = proj.get("Project_Description", proj.get("Description", "N/A"))
+                        if description and description.strip().lower() not in ["na", "n/a"]:
+                            st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;*Description:* {description}")
             else:
-                st.info("No project details provided.")
+                st.info("No project details provided. (Projects section excluded from scoring)")
 
             st.markdown("---")
             st.markdown("#### 🏆 Certifications")

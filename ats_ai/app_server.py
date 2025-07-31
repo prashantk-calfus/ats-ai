@@ -17,9 +17,8 @@ from starlette.responses import RedirectResponse
 from ats_ai.agent.jd_parser import extract_jd_info
 
 # ---- Import your agent functions ----
-from ats_ai.agent.llm_agent import (
+from ats_ai.agent.llm_agent import (  # evaluate_resume_against_jd,
     combined_parse_evaluate,
-    evaluate_resume_against_jd,
     extract_resume_info,
 )
 from ats_ai.scraper import CalfusJobScraper
@@ -83,16 +82,16 @@ async def resume_parser(resume_path: str):
         raise HTTPException(status_code=500, detail=f"Failed to start LLM parsing stream: {e}")
 
 
-@app.post("/evaluate_resume", status_code=status.HTTP_200_OK)
-async def evaluate_resume(payload: ResumeEvaluationRequest):
-    """
-    Evaluate resume with JD
-    """
-    try:
-        response = await evaluate_resume_against_jd(payload.jd_json, payload.resume_json)
-        return response
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to start LLM evaluation stream: {e}")
+# @app.post("/evaluate_resume", status_code=status.HTTP_200_OK)
+# async def evaluate_resume(payload: ResumeEvaluationRequest):
+#     """
+#     Evaluate resume with JD
+#     """
+#     try:
+#         response = await evaluate_resume_against_jd(payload.jd_json, payload.resume_json)
+#         return response
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=f"Failed to start LLM evaluation stream: {e}")
 
 
 @app.post("/parse_and_evaluate", status_code=status.HTTP_200_OK)
