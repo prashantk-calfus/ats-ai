@@ -9,7 +9,6 @@ services:
       - "8000:8000"
     volumes:
       - .:/app
-     # - ./jd_json:/app/jd_json
     restart: unless-stopped
 
   ui:
@@ -22,7 +21,6 @@ services:
       - "8501:8501"
     volumes:
       - .:/app
-   #   - ./jd_json:/app/jd_json
     restart: unless-stopped
     environment:
       - BACKEND_URL=http://backend:8000
