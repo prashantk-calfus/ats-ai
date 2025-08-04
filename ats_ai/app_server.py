@@ -9,6 +9,7 @@ from typing import Any, Dict
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 from langchain_community.document_loaders import PyMuPDFLoader
 from pydantic import BaseModel
 from starlette import status
@@ -21,6 +22,7 @@ from ats_ai.agent.llm_agent import (  # evaluate_resume_against_jd,
     combined_parse_evaluate,
     extract_resume_info,
 )
+from ats_ai.pdf_generator import generate_pdf_report
 from ats_ai.scraper import CalfusJobScraper
 
 # ---- Constants ----
@@ -283,6 +285,35 @@ def shutdown_event():
     if scheduler:
         scheduler.shutdown()
         logger.info("Background scheduler stopped")
+
+
+@app.post("/generate_pdf_report", status_code=status.HTTP_200_OK)
+async def generate_pdf_report_endpoint(report_data: Dict[str, Any]):
+    """Generate PDF report and return file path"""
+    try:
+        evaluation_results = report_data.get("evaluation_results")
+        parsed_resume = report_data.get("parsed_resume")
+        candidate_name = report_data.get("candidate_name")
+        jd_source = report_data.get("jd_source", "Unknown JD")
+
+        # Generate PDF
+        pdf_filename = generate_pdf_report(evaluation_results, parsed_resume, candidate_name, jd_source)
+
+        return {"status": "success", "pdf_path": pdf_filename, "message": "PDF report generated successfully"}
+
+    except Exception as e:
+        logger.error(f"Error generating PDF report: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error generating PDF report: {str(e)}")
+
+
+@app.get("/download_report/{filename}")
+async def download_report(filename: str):
+    """Download the generated PDF report"""
+    file_path = f"reports/{filename}"
+    if os.path.exists(file_path):
+        return FileResponse(file_path, media_type="application/pdf", filename=filename)
+    else:
+        raise HTTPException(status_code=404, detail="Report file not found")
 
 
 # ---- Run ----

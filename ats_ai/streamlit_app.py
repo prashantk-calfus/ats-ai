@@ -564,8 +564,44 @@ if st.session_state.parsed_data_combined:
                     st.error(f"Failed to store decision: {response.text}")
 
         with col3:
-            if st.button("📊 Generate Report", key="generate_report_btn"):
-                st.session_state.report_evaluation_results = eval_results
-                st.session_state.report_parsed_resume = parsed_resume_data
-                st.session_state.report_cand_name = candidate_name
-                st.switch_page("pages/report_page.py")
+            if st.button("📥 Download PDF Report", key="generate_pdf_report_btn"):
+                with st.spinner("🔄 Generating PDF report..."):
+                    try:
+                        # Determine JD source properly
+                        if st.session_state.get("current_selected_jd"):
+                            jd_source_name = f"Selected JD: {st.session_state.current_selected_jd}"
+                        elif st.session_state.get("current_jd_name"):
+                            jd_source_name = f"Temporary JD: {st.session_state.current_jd_name}"
+                        else:
+                            jd_source_name = "Unknown JD"
+
+                        report_data = {"evaluation_results": eval_results, "parsed_resume": parsed_resume_data, "candidate_name": candidate_name, "jd_source": jd_source_name}
+
+                        # Call backend to generate PDF
+                        response = requests.post(f"{BACKEND_URL}/generate_pdf_report", json=report_data)
+
+                        if response.status_code == 200:
+                            result = response.json()
+                            pdf_filename = os.path.basename(result["pdf_path"])
+                            download_url = f"{BACKEND_URL}/download_report/{pdf_filename}"
+
+                            st.success("✅ PDF Report generated successfully!")
+
+                            # Inject JS to auto-download the PDF
+                            download_html = f"""
+                                <html>
+                                    <body>
+                                        <a id="download_pdf_link" href="{download_url}" download style="display:none;"></a>
+                                        <script>
+                                            document.getElementById('download_pdf_link').click();
+                                        </script>
+                                    </body>
+                                </html>
+                            """
+                            st.components.v1.html(download_html, height=0)
+
+                        else:
+                            st.error(f"❌ Failed to generate PDF: {response.text}")
+
+                    except Exception as e:
+                        st.error(f"❌ Error generating PDF report: {str(e)}")

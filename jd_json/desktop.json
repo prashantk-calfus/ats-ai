@@ -1,0 +1,49 @@
+{
+  "Job_Title": "Desktop Engineer",
+  "Required_Skills": [
+    "Windows operating systems",
+    "Microsoft 365",
+    "Active Directory",
+    "Remote support tools",
+    "Networking concepts (TCP/IP, DNS, DHCP)",
+    "VPN Clients (Global Protect, Cisco AnyConnect, FortiClient)",
+    "Troubleshooting",
+    "Hardware setup",
+    "Software setup",
+    "Peripherals setup",
+    "Vulnerability scans",
+    "MacOS",
+    "IT asset records",
+    "User account management",
+    "Security checks",
+    "Hardware provisioning",
+    "Email configuration"
+  ],
+  "Preferred_Skills": [
+    "MacOS support",
+    "Microsoft 365 administration tools (Intune, Exchange Online, Entra ID, Teams, SharePoint)"
+  ],
+  "Minimum_Experience": "1–2 years",
+  "Location": "Pune",
+  "Responsibilities": [
+    "Setup and troubleshooting of hardware, software, and peripherals",
+    "Managing user accounts and VPNs",
+    "Handling onboarding/offboarding",
+    "Maintaining IT asset records",
+    "Coordinating repairs",
+    "Performing security checks",
+    "Resolving issues with operating systems",
+    "Diagnoses and resolve issues related to MacOS and Windows OS, Microsoft 365 applications (Outlook, Word, Excel, Teams, etc.), and other business-critical applications.",
+    "Manage user accounts, groups, mailboxes and access rights.",
+    "Set up and troubleshoot VPN clients (Global Protect, Cisco AnyConnect, FortiClient).",
+    "Maintain accurate IT asset records and conduct routine hardware inventory audits.",
+    "Coordinate with vendors and OEM for hardware warranty and repair support.",
+    "Perform security checks, vulnerability scans, and apply necessary patches.",
+    "Troubleshoot video conferencing issues (Microsoft Teams, Zoom, WebEx)."
+  ],
+  "Qualifications": [
+    "Bachelor’s degree in computer science, Information Technology, or a related field"
+  ],
+  "Domain": "IT",
+  "Key_considerations_for_hiring": []
+}
