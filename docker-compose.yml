@@ -8,7 +8,6 @@ services:
     ports:
       - "8000:8000"
     volumes:
-#      - .:/ats-ai
       - .:/app
     restart: unless-stopped
 
@@ -20,7 +19,6 @@ services:
     ports:
       - "8501:8501"
     volumes:
-#      - .:/ats-ai
       - .:/app
     restart: unless-stopped
     environment:

@@ -15,6 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Fixed
 - Placeholder for upcoming fixes.
 
+
+---
+
+## [1.0.0] - 2025-08-03
+### Fixed
+- JD saving functionality from UI.
+
 ---
 
 
