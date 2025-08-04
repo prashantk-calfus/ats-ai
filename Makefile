@@ -4,11 +4,11 @@ VERSION := $(shell awk -F '"' '/^version =/ { print $$2 }' pyproject.toml)
 POETRY_HOME := $(shell echo $$HOME/.local/bin)
 VENV_DIR := .venv
 PYTHON_VERSION := 3.13
-PROD_IMAGE := ramdorak571/ats_ai_base:$(VERSION)
+PROD_IMAGE := shivanjalibelge/ats_ai_base:$(VERSION)
 LOCAL_IMAGE := ats_ai_base:$(VERSION)
 
 prod: build
-	PROD_IMAGE=$(PROD_IMAGE) docker compose up -d
+	PROD_IMAGE=$(LOCAL_IMAGE) docker compose up -d
 
 local: install
 	chmod +x start.sh
@@ -25,7 +25,7 @@ install: make_env
 	poetry run pre-commit install
 
 build:
-	docker build --platform linux/amd64 -t $(PROD_IMAGE) .
+	docker build --platform linux/amd64 -t $(LOCAL_IMAGE) .
 
 push:
 	docker push $(PROD_IMAGE)

@@ -1,6 +1,6 @@
 [project]
 name = "ats_ai"
-version = "0.2.6"
+version = "0.2.8"
 description = "AI driven HR app"
 authors = [
     {name = "Ram Dorak",email = "ram.dorak@calfus.com"},
@@ -28,7 +28,8 @@ dependencies = [
     "python-dotenv (>=1.1.1,<2.0.0)",
     "requests (>=2.32.4,<3.0.0)",
     "reportlab (>=4.4.3,<5.0.0)",
-    "starlette (>=0.47.2,<0.48.0)"
+    "starlette (>=0.47.2,<0.48.0)",
+    "pre-commit (>=4.2.0,<5.0.0)"
 ]
 
 [build-system]

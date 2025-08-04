@@ -93,6 +93,8 @@ with tab1:
                 try:
                     jd_filename = f"{selected_jd_display}.json"
                     jd_path = os.path.join("jd_json", jd_filename)
+                    # st.write(os.getcwd())
+                    # st.write(jd_path)
                     if os.path.exists(jd_path):
                         with open(jd_path, "r") as f:
                             jd_content = json.load(f)

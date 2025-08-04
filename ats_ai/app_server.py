@@ -273,18 +273,18 @@ async def trigger_scraper_with_conversion():
 scheduler = None
 
 
-@app.on_event("startup")
-def startup_event():
-
-    start_scheduler()
-
-
-@app.on_event("shutdown")
-def shutdown_event():
-
-    if scheduler:
-        scheduler.shutdown()
-        logger.info("Background scheduler stopped")
+# @app.on_event("startup")
+# def startup_event():
+#
+#     start_scheduler()
+#
+#
+# @app.on_event("shutdown")
+# def shutdown_event():
+#
+#     if scheduler:
+#         scheduler.shutdown()
+#         logger.info("Background scheduler stopped")
 
 
 @app.post("/generate_pdf_report", status_code=status.HTTP_200_OK)
