@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000/")
+BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
 
 st.set_page_config(layout="wide", page_title="ATS AI")
 st.title("ATS AI : Intelligent Resume Screening")
@@ -590,17 +590,6 @@ if st.session_state.parsed_data_combined:
                             st.success("✅ PDF Report generated successfully!")
 
                             # Inject JS to auto-download the PDF
-                            # download_html = f"""
-                            #     <html>
-                            #         <body>
-                            #             <a id="download_pdf_link" href="{download_url}" download style="display:none;"></a>
-                            #             <script>
-                            #                 document.getElementById('download_pdf_link').click();
-                            #             </script>
-                            #         </body>
-                            #     </html>
-                            # """
-                            # st.components.v1.html(download_html, height=0)
                             # download_html = f"""
                             #     <html>
                             #         <body>
