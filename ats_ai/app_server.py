@@ -9,6 +9,7 @@ from typing import Any, Dict
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from langchain_community.document_loaders import PyMuPDFLoader
 from pydantic import BaseModel
@@ -32,7 +33,13 @@ RESUME_FILE_UPLOAD = File(...)
 
 # ---- FastAPI app ----
 app = FastAPI(title="Resume Parsing & Evaluation")
-
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

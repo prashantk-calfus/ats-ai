@@ -590,17 +590,30 @@ if st.session_state.parsed_data_combined:
                             st.success("✅ PDF Report generated successfully!")
 
                             # Inject JS to auto-download the PDF
-                            download_html = f"""
-                                <html>
-                                    <body>
-                                        <a id="download_pdf_link" href="{download_url}" download style="display:none;"></a>
-                                        <script>
-                                            document.getElementById('download_pdf_link').click();
-                                        </script>
-                                    </body>
-                                </html>
-                            """
-                            st.components.v1.html(download_html, height=0)
+                            # download_html = f"""
+                            #     <html>
+                            #         <body>
+                            #             <a id="download_pdf_link" href="{download_url}" download style="display:none;"></a>
+                            #             <script>
+                            #                 document.getElementById('download_pdf_link').click();
+                            #             </script>
+                            #         </body>
+                            #     </html>
+                            # """
+                            # st.components.v1.html(download_html, height=0)
+                            # download_html = f"""
+                            #     <html>
+                            #         <body>
+                            #             <a id="download_pdf_link" href="{download_url}" download style="display:none;"></a>
+                            #             <script>
+                            #                 document.getElementById('download_pdf_link').click();
+                            #             </script>
+                            #         </body>
+                            #     </html>
+                            # """
+                            # st.components.v1.html(download_html, height=0)
+
+                            st.markdown(f"[📥 Click here to download your PDF report]({download_url})", unsafe_allow_html=True)
 
                         else:
                             st.error(f"❌ Failed to generate PDF: {response.text}")
