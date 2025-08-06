@@ -25,7 +25,7 @@ install: make_env
 	poetry run pre-commit install
 
 build:
-	docker build --platform linux/amd64 -t $(PROD_IMAGE) .
+	docker build --platform linux/arm64 -t $(PROD_IMAGE) .
 
 push:
 	docker push $(PROD_IMAGE)
@@ -53,3 +53,8 @@ install_poetry:
 	else \
 		echo "Poetry already installed."; \
 	fi
+
+
+
+
+

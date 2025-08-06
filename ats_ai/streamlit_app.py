@@ -1,7 +1,9 @@
 import json
 import os
 import time
+from pathlib import Path
 
+import mammoth
 import pymupdf
 import requests
 import streamlit as st
@@ -13,6 +15,31 @@ BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
 
 st.set_page_config(layout="wide", page_title="ATS AI")
 st.title("ATS AI : Intelligent Resume Screening")
+
+
+def extract_text_from_uploaded_file(uploaded_file):
+    file_extension = Path(uploaded_file.name).suffix.lower()
+
+    if file_extension == ".pdf":
+        resume_pdf_reader = pymupdf.open(stream=uploaded_file.getvalue(), filetype="pdf")
+        resume_text = ""
+        for i in range(resume_pdf_reader.page_count):
+            page = resume_pdf_reader.load_page(i)
+            resume_text += page.get_text()
+        return resume_text
+
+    elif file_extension in [".doc", ".docx"]:
+        try:
+            result = mammoth.extract_raw_text(uploaded_file)
+            return result.value
+        except Exception as e:
+            st.error(f"Error reading {file_extension} file: {str(e)}")
+            return None
+
+    else:
+        st.error(f"Unsupported file format: {file_extension}")
+        return None
+
 
 # Initialize all session state variables
 if "parsed_data_combined" not in st.session_state:
@@ -45,7 +72,7 @@ if "current_jd_text" not in st.session_state:
 if "current_jd_name" not in st.session_state:
     st.session_state.current_jd_name = ""
 
-uploaded_resume = st.file_uploader("Upload resume file (PDF)", type=["pdf"])
+uploaded_resume = st.file_uploader("Upload resume file (PDF, DOC, DOCX)", type=["pdf", "doc", "docx"], help="Supported formats: PDF, DOC, DOCX")
 
 if uploaded_resume is not None:
     if st.session_state.uploaded_resume_name != uploaded_resume.name:
@@ -93,8 +120,6 @@ with tab1:
                 try:
                     jd_filename = f"{selected_jd_display}.json"
                     jd_path = os.path.join("jd_json", jd_filename)
-                    # st.write(os.getcwd())
-                    # st.write(jd_path)
                     if os.path.exists(jd_path):
                         with open(jd_path, "r") as f:
                             jd_content = json.load(f)
@@ -123,10 +148,10 @@ with tab1:
                             try:
                                 # Read resume text
                                 resume_pdf_reader = pymupdf.open(stream=uploaded_resume.getvalue(), filetype="pdf")
-                                resume_text = ""
-                                for i in range(resume_pdf_reader.page_count):
-                                    page = resume_pdf_reader.load_page(i)
-                                    resume_text += page.get_text()
+                                resume_text = extract_text_from_uploaded_file(uploaded_resume)
+                                if resume_text is None:
+                                    st.error("Failed to extract text from the uploaded file")
+                                    st.stop()
 
                                 # Upload resume file
                                 files = {"resume_file": (uploaded_resume.name, uploaded_resume.getvalue(), uploaded_resume.type)}
@@ -254,10 +279,10 @@ with tab2:
                     try:
                         # Read resume text
                         resume_pdf_reader = pymupdf.open(stream=uploaded_resume.getvalue(), filetype="pdf")
-                        resume_text = ""
-                        for i in range(resume_pdf_reader.page_count):
-                            page = resume_pdf_reader.load_page(i)
-                            resume_text += page.get_text()
+                        resume_text = extract_text_from_uploaded_file(uploaded_resume)
+                        if resume_text is None:
+                            st.error("Failed to extract text from the uploaded file")
+                            st.stop()
 
                         # Upload resume file
                         files = {"resume_file": (uploaded_resume.name, uploaded_resume.getvalue(), uploaded_resume.type)}
@@ -585,24 +610,26 @@ if st.session_state.parsed_data_combined:
                         if response.status_code == 200:
                             result = response.json()
                             pdf_filename = os.path.basename(result["pdf_path"])
-                            download_url = f"{BACKEND_URL}/download_report/{pdf_filename}"
+                            # download_url = f"{BACKEND_URL}/download_report/{pdf_filename}"
+
+                            download_url = f"http://localhost:8000/download_report/{pdf_filename}"
 
                             st.success("✅ PDF Report generated successfully!")
 
                             # Inject JS to auto-download the PDF
-                            # download_html = f"""
-                            #     <html>
-                            #         <body>
-                            #             <a id="download_pdf_link" href="{download_url}" download style="display:none;"></a>
-                            #             <script>
-                            #                 document.getElementById('download_pdf_link').click();
-                            #             </script>
-                            #         </body>
-                            #     </html>
-                            # """
-                            # st.components.v1.html(download_html, height=0)
+                            download_html = f"""
+                                <html>
+                                    <body>
+                                        <a id="download_pdf_link" href="{download_url}" download style="display:none;"></a>
+                                        <script>
+                                            document.getElementById('download_pdf_link').click();
+                                        </script>
+                                    </body>
+                                </html>
+                            """
+                            st.components.v1.html(download_html, height=0)
 
-                            st.markdown(f"[📥 Click here to download your PDF report]({download_url})", unsafe_allow_html=True)
+                            # st.markdown(f"[📥 Click here to download your PDF report]({download_url})", unsafe_allow_html=True)
 
                         else:
                             st.error(f"❌ Failed to generate PDF: {response.text}")
