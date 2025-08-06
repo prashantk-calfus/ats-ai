@@ -10,7 +10,6 @@ LOCAL_IMAGE := ats_ai_base:$(VERSION)
 prod: build
 	PROD_IMAGE=$(PROD_IMAGE) docker compose up -d
 
-
 local: install
 	chmod +x start.sh
 	./start.sh
