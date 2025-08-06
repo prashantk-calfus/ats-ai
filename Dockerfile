@@ -19,8 +19,8 @@ RUN poetry config virtualenvs.create false \
     && poetry install --no-root --no-interaction --no-ansi
 
 # Copy just the core-package of the code
-COPY ats_ai ./ats_ai
-COPY .streamlit ./.streamlit
+COPY ats_ai /app/ats_ai
+COPY .streamlit /app/.streamlit
 COPY jd_json ./jd_json
 COPY jd_folder ./jd_folder
 

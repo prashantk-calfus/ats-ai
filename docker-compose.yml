@@ -4,12 +4,10 @@ services:
     container_name: ats_fastapi
     platform: linux/amd64
     command: uvicorn ats_ai.app_server:app --host 0.0.0.0 --port 8000
-#    command: ./start.sh
     ports:
       - "8000:8000"
     volumes:
       - .:/app
-     # - ./jd_json:/app/jd_json
     restart: unless-stopped
 
   ui:
@@ -17,12 +15,10 @@ services:
     platform: linux/amd64
     container_name: ats_streamlit
     command: streamlit run ats_ai/streamlit_app.py --server.port 8501
-#    command: ./start.sh
     ports:
       - "8501:8501"
     volumes:
       - .:/app
-   #   - ./jd_json:/app/jd_json
     restart: unless-stopped
     environment:
       - BACKEND_URL=http://backend:8000

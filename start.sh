@@ -1,6 +1,6 @@
 #!/bin/sh
 
-#sleep infinity
+sleep infinity
 
 # Start FastAPI in the background and log to fastapi.log
 poetry run uvicorn ats_ai.app_server:app --host 0.0.0.0 --port 8000 --reload > .logs/fastapi.log 2>&1 &
