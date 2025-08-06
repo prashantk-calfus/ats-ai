@@ -7,7 +7,7 @@ PYTHON_VERSION := 3.13
 PROD_IMAGE := shivanjalibelge/ats_ai_base:$(VERSION)
 LOCAL_IMAGE := ats_ai_base:$(VERSION)
 
-prod: #build
+prod: build
 	PROD_IMAGE=$(PROD_IMAGE) docker compose up -d
 
 
@@ -26,7 +26,7 @@ install: make_env
 	poetry run pre-commit install
 
 build:
-	docker build --platform linux/amd64 -t $(PROD_IMAGE) .
+	docker build --platform linux/arm64 -t $(PROD_IMAGE) .
 
 push:
 	docker push $(PROD_IMAGE)
