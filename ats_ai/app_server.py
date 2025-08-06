@@ -5,12 +5,14 @@ import os
 import re
 import shutil
 import threading
+from pathlib import Path
 from typing import Any, Dict
 
+import mammoth
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, PlainTextResponse
 from langchain_community.document_loaders import PyMuPDFLoader
 from pydantic import BaseModel
 from starlette import status
@@ -61,57 +63,6 @@ def load_pdf_text(file_path: str) -> str:
     loader = PyMuPDFLoader(file_path)
     pages = loader.load()
     return " ".join(page.page_content for page in pages)
-
-
-# ---- Endpoints ----
-@app.post("/upload_resume_file", status_code=status.HTTP_200_OK)
-async def upload_resume_file(resume_file: UploadFile = RESUME_FILE_UPLOAD):
-    if not resume_file.filename:
-        raise HTTPException(status_code=400, detail="No file found")
-    if not resume_file.filename.endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="Only PDF format supported")
-
-    os.makedirs(RESUME_UPLOAD_FOLDER, exist_ok=True)
-    file_path = os.path.join(RESUME_UPLOAD_FOLDER, resume_file.filename)
-
-    with open(file_path, "wb") as f:
-        shutil.copyfileobj(resume_file.file, f)
-
-    return {"message": "Resume uploaded successfully", "file_path": file_path}
-
-
-@app.get("/resume_parser")
-async def resume_parser(resume_path: str):
-    raw_resume_text = load_pdf_text(os.path.join(RESUME_UPLOAD_FOLDER, resume_path))
-
-    try:
-        response = await extract_resume_info(raw_resume_text)
-        return response
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to start LLM parsing stream: {e}")
-
-
-# @app.post("/evaluate_resume", status_code=status.HTTP_200_OK)
-# async def evaluate_resume(payload: ResumeEvaluationRequest):
-#     """
-#     Evaluate resume with JD
-#     """
-#     try:
-#         response = await evaluate_resume_against_jd(payload.jd_json, payload.resume_json)
-#         return response
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=f"Failed to start LLM evaluation stream: {e}")
-
-
-@app.post("/parse_and_evaluate", status_code=status.HTTP_200_OK)
-async def parse_and_evaluate(combined_json: Dict[str, Any]):
-    resume_data = combined_json.get("resume_data")
-    jd_json = combined_json.get("jd_json")
-
-    if not resume_data or not jd_json:
-        raise HTTPException(status_code=422, detail="Missing resume_data or jd_json")
-
-    return await combined_parse_evaluate(resume_data, jd_json)
 
 
 @app.post("/store_candidate_evaluation", status_code=status.HTTP_200_OK)
@@ -279,7 +230,6 @@ async def trigger_scraper_with_conversion():
 # Global scheduler variable
 scheduler = None
 
-
 # @app.on_event("startup")
 # def startup_event():
 #
@@ -315,12 +265,93 @@ async def generate_pdf_report_endpoint(report_data: Dict[str, Any]):
 
 @app.get("/download_report/{filename}")
 async def download_report(filename: str):
-    """Download the generated PDF report"""
     file_path = f"reports/{filename}"
     if os.path.exists(file_path):
         return FileResponse(file_path, media_type="application/pdf", filename=filename)
     else:
         raise HTTPException(status_code=404, detail="Report file not found")
+
+
+# Add this helper function in app_server.py
+def extract_text_from_document(file_path: str) -> str:
+    file_extension = Path(file_path).suffix.lower()
+
+    if file_extension == ".pdf":
+        loader = PyMuPDFLoader(file_path)
+        pages = loader.load()
+        return " ".join(page.page_content for page in pages)
+
+    elif file_extension in [".doc", ".docx"]:
+        try:
+            with open(file_path, "rb") as doc_file:
+                result = mammoth.extract_raw_text(doc_file)
+                return result.value
+        except Exception as e:
+            logger.error(f"Error reading {file_extension} file {file_path}: {e}")
+            raise HTTPException(status_code=500, detail=f"Error reading {file_extension} file: {str(e)}")
+
+    else:
+        raise HTTPException(status_code=400, detail=f"Unsupported file format: {file_extension}")
+
+
+# 2. Modify the upload_resume_file endpoint in app_server.py
+@app.post("/upload_resume_file", status_code=status.HTTP_200_OK)
+async def upload_resume_file(resume_file: UploadFile = RESUME_FILE_UPLOAD):
+    if not resume_file.filename:
+        raise HTTPException(status_code=400, detail="No file found")
+
+    # Updated to accept PDF, DOC, and DOCX files
+    allowed_extensions = [".pdf", ".doc", ".docx"]
+    file_extension = Path(resume_file.filename).suffix.lower()
+
+    if file_extension not in allowed_extensions:
+        raise HTTPException(status_code=400, detail="Only PDF, DOC, and DOCX formats are supported")
+
+    os.makedirs(RESUME_UPLOAD_FOLDER, exist_ok=True)
+    file_path = os.path.join(RESUME_UPLOAD_FOLDER, resume_file.filename)
+
+    with open(file_path, "wb") as f:
+        shutil.copyfileobj(resume_file.file, f)
+
+    return {"message": "Resume uploaded successfully", "file_path": file_path}
+
+
+# 3. Modify the resume_parser endpoint in app_server.py
+@app.get("/resume_parser")
+async def resume_parser(resume_path: str):
+    file_path = os.path.join(RESUME_UPLOAD_FOLDER, resume_path)
+
+    # Use the new universal text extraction function
+    try:
+        raw_resume_text = extract_text_from_document(file_path)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to extract text from file: {e}")
+
+    try:
+        response = await extract_resume_info(raw_resume_text)
+        return response
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to start LLM parsing stream: {e}")
+
+
+@app.post("/parse_and_evaluate", status_code=status.HTTP_200_OK)
+async def parse_and_evaluate(combined_json: Dict[str, Any]):
+    resume_data = combined_json.get("resume_data")
+    jd_json = combined_json.get("jd_json")
+
+    if not resume_data or not jd_json:
+        return PlainTextResponse(content="Missing resume_data or jd_json", status_code=422)
+    try:
+        resp = await combined_parse_evaluate(resume_data, jd_json)
+        return resp
+    except Exception as e:
+        error_str = str(e)
+        if "The model is overloaded" in error_str:
+            msg = "The model is overloaded. Please try after sometime."
+        else:
+            msg = error_str
+
+        return PlainTextResponse(content=msg, status_code=500)
 
 
 # ---- Run ----

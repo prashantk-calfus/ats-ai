@@ -7,8 +7,9 @@ PYTHON_VERSION := 3.13
 PROD_IMAGE := shivanjalibelge/ats_ai_base:$(VERSION)
 LOCAL_IMAGE := ats_ai_base:$(VERSION)
 
-prod: build
-	PROD_IMAGE=$(LOCAL_IMAGE) docker compose up -d
+prod: #build
+	PROD_IMAGE=$(PROD_IMAGE) docker compose up -d
+
 
 local: install
 	chmod +x start.sh
@@ -53,3 +54,8 @@ install_poetry:
 	else \
 		echo "Poetry already installed."; \
 	fi
+
+
+
+
+

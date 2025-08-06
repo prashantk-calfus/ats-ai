@@ -28,3 +28,7 @@ COPY jd_folder ./jd_folder
 RUN mkdir -p ..logs
 
 EXPOSE 8000 8501
+
+
+
+
