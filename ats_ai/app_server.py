@@ -252,9 +252,10 @@ async def generate_pdf_report_endpoint(report_data: Dict[str, Any]):
         parsed_resume = report_data.get("parsed_resume")
         candidate_name = report_data.get("candidate_name")
         jd_source = report_data.get("jd_source", "Unknown JD")
+        weightage_config = report_data.get("weightage_config")  # ADD THIS LINE
 
-        # Generate PDF
-        pdf_filename = generate_pdf_report(evaluation_results, parsed_resume, candidate_name, jd_source)
+        # Generate PDF with weightage config
+        pdf_filename = generate_pdf_report(evaluation_results, parsed_resume, candidate_name, jd_source, weightage_config)  # ADD THIS PARAMETER
 
         return {"status": "success", "pdf_path": pdf_filename, "message": "PDF report generated successfully"}
 
@@ -334,15 +335,34 @@ async def resume_parser(resume_path: str):
         raise HTTPException(status_code=500, detail=f"Failed to start LLM parsing stream: {e}")
 
 
-@app.post("/parse_and_evaluate", status_code=status.HTTP_200_OK)
-async def parse_and_evaluate(combined_json: Dict[str, Any]):
-    resume_data = combined_json.get("resume_data")
-    jd_json = combined_json.get("jd_json")
+# ---- Add these new models after existing models ----
+class WeightageConfig(BaseModel):
+    experience_weight: float = 0.3
+    skills_weight: float = 0.4
+    education_weight: float = 0.1
+    projects_weight: float = 0.2
 
-    if not resume_data or not jd_json:
+
+class ParseAndEvaluateRequest(BaseModel):
+    resume_data: str
+    jd_json: Dict[str, Any]
+    weightage_config: WeightageConfig = WeightageConfig()
+
+
+# ---- Replace the existing parse_and_evaluate endpoint ----
+@app.post("/parse_and_evaluate", status_code=status.HTTP_200_OK)
+async def parse_and_evaluate(request: ParseAndEvaluateRequest):
+    if not request.resume_data or not request.jd_json:
         return PlainTextResponse(content="Missing resume_data or jd_json", status_code=422)
+
+    # Validate weights sum to 1.0
+    total_weight = request.weightage_config.experience_weight + request.weightage_config.skills_weight + request.weightage_config.education_weight + request.weightage_config.projects_weight
+
+    if abs(total_weight - 1.0) > 0.01:  # Allow small floating point differences
+        return PlainTextResponse(content=f"Weightage must sum to 100% (1.0). Current sum: {total_weight:.2f}", status_code=400)
+
     try:
-        resp = await combined_parse_evaluate(resume_data, jd_json)
+        resp = await combined_parse_evaluate(request.resume_data, request.jd_json, request.weightage_config)
         return resp
     except Exception as e:
         error_str = str(e)
@@ -350,10 +370,4 @@ async def parse_and_evaluate(combined_json: Dict[str, Any]):
             msg = "The model is overloaded. Please try after sometime."
         else:
             msg = error_str
-
         return PlainTextResponse(content=msg, status_code=500)
-
-
-# ---- Run ----
-# if __name__ == "__main__":
-#     uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -18,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [Unreleased]
+### Added
+- Added weightage percentage display on frontend.
+- Accepting document uploads.
+- Report generation feature implemented and working.
+---
+
 ## [1.0.0] - 2025-08-03
 ### Fixed
 - JD saving functionality from UI.

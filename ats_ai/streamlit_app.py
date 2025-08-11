@@ -41,6 +41,12 @@ def extract_text_from_uploaded_file(uploaded_file):
         return None
 
 
+def validate_weightage_sum(exp, skills, edu, projects):
+    """Validate that weightages sum to 100"""
+    total = exp + skills + edu + projects
+    return total, abs(total - 100) <= 1  # Allow 1% tolerance
+
+
 # Initialize all session state variables
 if "parsed_data_combined" not in st.session_state:
     st.session_state.parsed_data_combined = None
@@ -71,6 +77,10 @@ if "current_jd_text" not in st.session_state:
     st.session_state.current_jd_text = ""
 if "current_jd_name" not in st.session_state:
     st.session_state.current_jd_name = ""
+if "weightage_config" not in st.session_state:
+    st.session_state.weightage_config = {"experience_weight": 30, "skills_weight": 40, "education_weight": 10, "projects_weight": 20}  # Store as percentages for UI
+if "show_weightage_config" not in st.session_state:
+    st.session_state.show_weightage_config = False
 
 uploaded_resume = st.file_uploader("Upload resume file (PDF, DOC, DOCX)", type=["pdf", "doc", "docx"], help="Supported formats: PDF, DOC, DOCX")
 
@@ -84,6 +94,62 @@ else:
         st.session_state.uploaded_resume_name = None
         st.session_state.parsed_data_combined = None
         st.session_state.decision_made = None
+
+# ---- WEIGHTAGE CONFIGURATION SECTION ----
+st.markdown("---")
+st.header("Evaluation Weightage Configuration")
+
+# Toggle button for weightage configuration
+col_toggle, col_reset = st.columns([3, 1])
+with col_toggle:
+    if st.button("🔧 Configure Custom Weightage" if not st.session_state.show_weightage_config else "📊 Use Default Weightage"):
+        st.session_state.show_weightage_config = not st.session_state.show_weightage_config
+
+with col_reset:
+    if st.button("🔄 Reset to Default"):
+        st.session_state.weightage_config = {"experience_weight": 30, "skills_weight": 40, "education_weight": 10, "projects_weight": 20}
+        if st.session_state.show_weightage_config:
+            st.rerun()
+
+if st.session_state.show_weightage_config:
+    st.info("Customize the weightage for each evaluation criterion. Total must equal 100%.")
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+        experience_weight = st.slider("Experience Weight (%)", min_value=0, max_value=100, value=st.session_state.weightage_config["experience_weight"], step=5, key="exp_weight_slider")
+
+    with col2:
+        skills_weight = st.slider("Skills Weight (%)", min_value=0, max_value=100, value=st.session_state.weightage_config["skills_weight"], step=5, key="skills_weight_slider")
+
+    with col3:
+        projects_weight = st.slider("Projects Weight (%)", min_value=0, max_value=100, value=st.session_state.weightage_config["projects_weight"], step=5, key="projects_weight_slider")
+
+    with col4:
+        education_weight = st.slider("Education Weight (%)", min_value=0, max_value=100, value=st.session_state.weightage_config["education_weight"], step=5, key="edu_weight_slider")
+
+    # Update session state
+    st.session_state.weightage_config = {"experience_weight": experience_weight, "skills_weight": skills_weight, "education_weight": education_weight, "projects_weight": projects_weight}
+
+    # Validate sum
+    total_weight, is_valid = validate_weightage_sum(experience_weight, skills_weight, education_weight, projects_weight)
+
+    # Display validation status
+    col_status, col_current = st.columns([1, 2])
+    with col_status:
+        if is_valid:
+            st.success(f"✅ Valid Configuration (Total: {total_weight}%)")
+        else:
+            st.error(f"❌ Invalid Configuration (Total: {total_weight}%)")
+
+    with col_current:
+        st.write(f"**Current:** Exp: {experience_weight}%, Skills: {skills_weight}%, Projects: {projects_weight}%, Education: {education_weight}%")
+
+else:
+    # Show current default weightage
+    st.info("Using Default Weightage: Experience: 30%, Skills: 40%, Projects: 20%, Education: 10%")
+
+st.markdown("---")
 
 # JD Selection Section with Tabs
 st.header("Job Description")
@@ -130,54 +196,88 @@ with tab1:
                     st.error(f"Error loading selected JD: {str(e)}")
 
                 # Add the main evaluate button here inside tab1
-                if selected_jd_display != "Select a pre-existing JD" and st.session_state.uploaded_resume_name:
-                    st.markdown("---")
-                    # Show re-evaluation message if already evaluated
-                    if st.session_state.parsed_data_combined is not None:
-                        st.info("🔄 Click to re-evaluate with the current JD selection")
-
-                    if st.button("🚀 Evaluate", key="main_evaluate_btn"):
-                        # Reset previous results before new evaluation
+                if selected_jd_display != "Select a pre-existing JD":
+                    # NEW: Check if JD selection has changed
+                    if st.session_state.get("current_selected_jd") != selected_jd_display:
+                        st.session_state.current_selected_jd = selected_jd_display
+                        # Reset evaluation state when JD changes
                         st.session_state.parsed_data_combined = None
                         st.session_state.decision_made = None
                         st.session_state.report_evaluation_results = None
                         st.session_state.report_parsed_resume = None
                         st.session_state.report_cand_name = None
 
-                        with st.spinner("Processing resume and evaluating..."):
-                            try:
-                                # Read resume text
-                                resume_pdf_reader = pymupdf.open(stream=uploaded_resume.getvalue(), filetype="pdf")
-                                resume_text = extract_text_from_uploaded_file(uploaded_resume)
-                                if resume_text is None:
-                                    st.error("Failed to extract text from the uploaded file")
-                                    st.stop()
+                    # Load the selected JD file
+                    jd_content = None  # Initialize jd_content
+                    try:
+                        jd_filename = f"{selected_jd_display}.json"
+                        jd_path = os.path.join("jd_json", jd_filename)
+                        if os.path.exists(jd_path):
+                            with open(jd_path, "r") as f:
+                                jd_content = json.load(f)
+                            jd_source = f"Selected JD: {selected_jd_display}"
+                        else:
+                            st.warning(f"JD file not found locally: {jd_filename}")
+                    except Exception as e:
+                        st.error(f"Error loading selected JD: {str(e)}")
 
-                                # Upload resume file
-                                files = {"resume_file": (uploaded_resume.name, uploaded_resume.getvalue(), uploaded_resume.type)}
-                                upload_response = requests.post(f"{BACKEND_URL}/upload_resume_file", files=files)
+                    # Add the main evaluate button here inside tab1
+                    if selected_jd_display != "Select a pre-existing JD" and st.session_state.uploaded_resume_name:
+                        st.markdown("---")
+                        # Show re-evaluation message if already evaluated
+                        if st.session_state.parsed_data_combined is not None:
+                            st.info("🔄 Click to re-evaluate with the current JD selection")
 
-                                if upload_response.status_code != 200:
-                                    st.error(f"Failed to upload resume to backend: {upload_response.status_code} - {upload_response.text}")
+                        if st.button("🚀 Evaluate", key="main_evaluate_btn"):
+                            # Reset previous results before new evaluation
+                            st.session_state.parsed_data_combined = None
+                            st.session_state.decision_made = None
+                            st.session_state.report_evaluation_results = None
+                            st.session_state.report_parsed_resume = None
+                            st.session_state.report_cand_name = None
+
+                            with st.spinner("Processing resume and evaluating..."):
+                                try:
+                                    # Read resume text
+                                    resume_pdf_reader = pymupdf.open(stream=uploaded_resume.getvalue(), filetype="pdf")
+                                    resume_text = extract_text_from_uploaded_file(uploaded_resume)
+                                    if resume_text is None:
+                                        st.error("Failed to extract text from the uploaded file")
+                                        st.stop()
+
+                                    # Upload resume file
+                                    files = {"resume_file": (uploaded_resume.name, uploaded_resume.getvalue(), uploaded_resume.type)}
+                                    upload_response = requests.post(f"{BACKEND_URL}/upload_resume_file", files=files)
+
+                                    if upload_response.status_code != 200:
+                                        st.error(f"Failed to upload resume to backend: {upload_response.status_code} - {upload_response.text}")
+                                        st.session_state.parsed_data_combined = None
+                                        st.session_state.decision_made = None
+                                    else:
+                                        if jd_content:
+                                            # Prepare weightage config for API
+                                            weightage_api = {
+                                                "experience_weight": st.session_state.weightage_config["experience_weight"] / 100,
+                                                "skills_weight": st.session_state.weightage_config["skills_weight"] / 100,
+                                                "education_weight": st.session_state.weightage_config["education_weight"] / 100,
+                                                "projects_weight": st.session_state.weightage_config["projects_weight"] / 100,
+                                            }
+
+                                            combined_json = {"resume_data": resume_text, "jd_json": jd_content, "weightage_config": weightage_api}
+                                            response = requests.post(f"{BACKEND_URL}/parse_and_evaluate", json=combined_json)
+
+                                            if response.status_code == 200:
+                                                st.session_state.parsed_data_combined = response.json()
+                                            else:
+                                                st.error(f"Evaluation failed: {response.status_code} - {response.text}")
+                                                st.session_state.parsed_data_combined = None
+                                                st.session_state.decision_made = None
+                                        else:
+                                            st.error("Failed to process Job Description")
+                                except Exception as e:
+                                    st.error(f"An error occurred during evaluation: {e}")
                                     st.session_state.parsed_data_combined = None
                                     st.session_state.decision_made = None
-                                else:
-                                    if jd_content:
-                                        combined_json = {"resume_data": resume_text, "jd_json": jd_content}
-                                        response = requests.post(f"{BACKEND_URL}/parse_and_evaluate", json=combined_json)
-
-                                        if response.status_code == 200:
-                                            st.session_state.parsed_data_combined = response.json()
-                                        else:
-                                            st.error(f"Evaluation failed: {response.status_code} - {response.text}")
-                                            st.session_state.parsed_data_combined = None
-                                            st.session_state.decision_made = None
-                                    else:
-                                        st.error("Failed to process Job Description")
-                            except Exception as e:
-                                st.error(f"An error occurred during evaluation: {e}")
-                                st.session_state.parsed_data_combined = None
-                                st.session_state.decision_made = None
             else:
                 # Reset when no JD is selected
                 if st.session_state.get("current_selected_jd") is not None:
@@ -292,14 +392,23 @@ with tab2:
                             st.error(f"Failed to upload resume to backend: {upload_response.status_code} - {upload_response.text}")
                         else:
                             # Parse JD text temporarily WITHOUT saving to backend
+                            # Parse JD text temporarily WITHOUT saving to backend
                             temp_parse_response = requests.post(f"{BACKEND_URL}/parse_jd_temp/", json={"jd_text": jd_text_input})
 
                             if temp_parse_response.status_code == 200:
                                 response_data = temp_parse_response.json()
                                 temp_jd_content = response_data.get("parsed_data")
 
+                                # Prepare weightage config for API
+                                weightage_api = {
+                                    "experience_weight": st.session_state.weightage_config["experience_weight"] / 100,
+                                    "skills_weight": st.session_state.weightage_config["skills_weight"] / 100,
+                                    "education_weight": st.session_state.weightage_config["education_weight"] / 100,
+                                    "projects_weight": st.session_state.weightage_config["projects_weight"] / 100,
+                                }
+
                                 # Evaluate with temporary JD using the parsed content directly
-                                combined_json = {"resume_data": resume_text, "jd_json": temp_jd_content}
+                                combined_json = {"resume_data": resume_text, "jd_json": temp_jd_content, "weightage_config": weightage_api}
                                 response = requests.post(f"{BACKEND_URL}/parse_and_evaluate", json=combined_json)
 
                                 if response.status_code == 200:
@@ -328,8 +437,18 @@ with tab2:
             st.session_state.nav_message_time = None
 
 # Show current JD being used for evaluation
+# Show current JD being used for evaluation
 if st.session_state.parsed_data_combined and jd_source:
     st.info(f"📋 Evaluation performed using: **{jd_source}**")
+
+    # Show weightage used for evaluation
+    weightage_display = (
+        f"Experience: {st.session_state.weightage_config['experience_weight']}%, "
+        f"Skills: {st.session_state.weightage_config['skills_weight']}%, "
+        f"Projects: {st.session_state.weightage_config['projects_weight']}%, "
+        f"Education: {st.session_state.weightage_config['education_weight']}%"
+    )
+    st.info(f"⚖️ Weightage used: {weightage_display}")
 
 # Display Results - SCOREBOARD FIRST, then parsed resume details
 if st.session_state.parsed_data_combined:
@@ -369,26 +488,104 @@ if st.session_state.parsed_data_combined:
     projects_score = eval_results.get("Projects_Score", 0)
     projects_excluded = projects_score == 0.0
 
-    if projects_excluded:
-        st.info("ℹ️ Projects section was excluded from scoring due to insufficient project information. Weights redistributed to other sections.")
+    exp_pct = st.session_state.weightage_config["experience_weight"]
+    skills_pct = st.session_state.weightage_config["skills_weight"]
+    edu_pct = st.session_state.weightage_config["education_weight"]
+    projects_pct = st.session_state.weightage_config["projects_weight"]
 
-        col_ind_score1, col_ind_score2, col_ind_score3 = st.columns(3)
-        with col_ind_score1:
-            st.metric(label="Experience Score (40%)", value=exp_score)
-        with col_ind_score2:
-            st.metric(label="Skills Score (50%)", value=skill_score)
-        with col_ind_score3:
-            st.metric(label="Education Score (10%)", value=edu_score)
-    else:
-        col_ind_score1, col_ind_score2, col_ind_score3, col_ind_score4 = st.columns(4)
-        with col_ind_score1:
-            st.metric(label="Experience Score (30%)", value=exp_score)
-        with col_ind_score2:
-            st.metric(label="Skills Score (40%)", value=skill_score)
-        with col_ind_score3:
-            st.metric(label="Education Score (10%)", value=edu_score)
-        with col_ind_score4:
-            st.metric(label="Projects Score (20%)", value=projects_score)
+    # Create list of sections with non-zero weights
+    active_sections = []
+    if exp_pct > 0:
+        active_sections.append(("Experience", exp_score, exp_pct))
+    if skills_pct > 0:
+        active_sections.append(("Skills", skill_score, skills_pct))
+    if edu_pct > 0:
+        active_sections.append(("Education", edu_score, edu_pct))
+    if projects_pct > 0 and not projects_excluded:
+        active_sections.append(("Projects", projects_score, projects_pct))
+
+    # Handle projects redistribution display
+    if projects_excluded and projects_pct > 0:
+        # Calculate redistributed weights for display
+        total_other = exp_pct + skills_pct + edu_pct
+        if total_other > 0:
+            exp_adj = exp_pct + (projects_pct * (exp_pct / total_other)) if exp_pct > 0 else 0
+            skills_adj = skills_pct + (projects_pct * (skills_pct / total_other)) if skills_pct > 0 else 0
+            edu_adj = edu_pct + (projects_pct * (edu_pct / total_other)) if edu_pct > 0 else 0
+
+            st.warning(f"ℹ️ Projects excluded from scoring. {projects_pct}% weight redistributed proportionally.")
+
+            # Update active sections with adjusted weights
+            active_sections = []
+            if exp_pct > 0:
+                active_sections.append(("Experience", exp_score, exp_adj))
+            if skills_pct > 0:
+                active_sections.append(("Skills", skill_score, skills_adj))
+            if edu_pct > 0:
+                active_sections.append(("Education", edu_score, edu_adj))
+
+    # Display scores based on number of active sections
+    num_active = len(active_sections)
+
+    if num_active == 0:
+        st.error("⚠️ No sections have weight assigned. Please configure weightage.")
+    elif num_active == 1:
+        col1 = st.columns(1)[0]
+        with col1:
+            name, score, weight = active_sections[0]
+            st.metric(label=f"{name} Score ({weight:.1f}%)", value=score)
+    elif num_active == 2:
+        col1, col2 = st.columns(2)
+        with col1:
+            name, score, weight = active_sections[0]
+            st.metric(label=f"{name} Score ({weight:.1f}%)", value=score)
+        with col2:
+            name, score, weight = active_sections[1]
+            st.metric(label=f"{name} Score ({weight:.1f}%)", value=score)
+    elif num_active == 3:
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            name, score, weight = active_sections[0]
+            st.metric(label=f"{name} Score ({weight:.1f}%)", value=score)
+        with col2:
+            name, score, weight = active_sections[1]
+            st.metric(label=f"{name} Score ({weight:.1f}%)", value=score)
+        with col3:
+            name, score, weight = active_sections[2]
+            st.metric(label=f"{name} Score ({weight:.1f}%)", value=score)
+    elif num_active == 4:
+        col1, col2, col3, col4 = st.columns(4)
+        cols = [col1, col2, col3, col4]
+        for i, (name, score, weight) in enumerate(active_sections):
+            with cols[i]:
+                st.metric(label=f"{name} Score ({weight:.1f}%)", value=score)
+
+    # Show sections with 0% weight as informational
+    # Replace the section that shows zero weight sections (around lines 450-470) with this:
+
+    # Show sections with 0% weight as informational
+    zero_weight_sections = []
+    if exp_pct == 0:
+        # Only show if we actually have a meaningful score
+        if exp_score and exp_score > 0:
+            zero_weight_sections.append(("Experience", exp_score))
+        else:
+            zero_weight_sections.append(("Experience", "Not Evaluated"))
+
+    if skills_pct == 0:
+        # Only show if we actually have a meaningful score
+        if skill_score and skill_score > 0:
+            zero_weight_sections.append(("Skills", skill_score))
+        else:
+            zero_weight_sections.append(("Skills", "Not Evaluated"))
+
+    if edu_pct == 0:
+        # Only show if we actually have a meaningful score
+        if edu_score and edu_score > 0:
+            zero_weight_sections.append(("Education", edu_score))
+        else:
+            zero_weight_sections.append(("Education", "Not Evaluated"))
+
     st.markdown("---")
     st.subheader("💪 Strengths and Areas for Improvement")
 
@@ -602,7 +799,8 @@ if st.session_state.parsed_data_combined:
                         else:
                             jd_source_name = "Unknown JD"
 
-                        report_data = {"evaluation_results": eval_results, "parsed_resume": parsed_resume_data, "candidate_name": candidate_name, "jd_source": jd_source_name}
+                        # ADD WEIGHTAGE CONFIG TO REPORT DATA
+                        report_data = {"evaluation_results": eval_results, "parsed_resume": parsed_resume_data, "candidate_name": candidate_name, "jd_source": jd_source_name, "weightage_config": st.session_state.weightage_config}  # ADD THIS LINE
 
                         # Call backend to generate PDF
                         response = requests.post(f"{BACKEND_URL}/generate_pdf_report", json=report_data)
@@ -610,8 +808,6 @@ if st.session_state.parsed_data_combined:
                         if response.status_code == 200:
                             result = response.json()
                             pdf_filename = os.path.basename(result["pdf_path"])
-                            # download_url = f"{BACKEND_URL}/download_report/{pdf_filename}"
-
                             download_url = f"http://localhost:8000/download_report/{pdf_filename}"
 
                             st.success("✅ PDF Report generated successfully!")
@@ -628,8 +824,6 @@ if st.session_state.parsed_data_combined:
                                 </html>
                             """
                             st.components.v1.html(download_html, height=0)
-
-                            # st.markdown(f"[📥 Click here to download your PDF report]({download_url})", unsafe_allow_html=True)
 
                         else:
                             st.error(f"❌ Failed to generate PDF: {response.text}")

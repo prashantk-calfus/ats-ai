@@ -8,7 +8,7 @@ from reportlab.lib.units import inch
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 
-def generate_pdf_report(evaluation_results, parsed_resume, candidate_name, jd_source="Unknown JD"):
+def generate_pdf_report(evaluation_results, parsed_resume, candidate_name, jd_source="Unknown JD", weightage_config=None):
     """Generate a clean, readable PDF report matching the Streamlit app format exactly"""
 
     # Create reports directory if it doesn't exist
@@ -25,14 +25,20 @@ def generate_pdf_report(evaluation_results, parsed_resume, candidate_name, jd_so
 
     # Simple, clean styles
     title_style = ParagraphStyle("Title", parent=styles["Heading1"], fontSize=20, spaceAfter=20, alignment=1, fontName="Helvetica-Bold")
-
     heading_style = ParagraphStyle("Heading", parent=styles["Heading2"], fontSize=14, spaceAfter=12, fontName="Helvetica-Bold")
-
     subheading_style = ParagraphStyle("SubHeading", parent=styles["Heading3"], fontSize=12, spaceAfter=8, fontName="Helvetica-Bold")
 
     # Title
     story.append(Paragraph(f"Evaluation Report for: {candidate_name}", title_style))
     story.append(Paragraph(f"Job Description: {jd_source}", styles["Normal"]))
+
+    # ADD WEIGHTAGE INFORMATION HERE
+    if weightage_config:
+        weightage_display = f"Experience: {weightage_config['experience_weight']}%, " f"Skills: {weightage_config['skills_weight']}%, " f"Projects: {weightage_config['projects_weight']}%, " f"Education: {weightage_config['education_weight']}%"
+        story.append(Paragraph(f"Weightage Used: {weightage_display}", styles["Normal"]))
+    else:
+        story.append(Paragraph("Weightage Used: Default (Experience: 30%, Skills: 40%, Projects: 20%, Education: 10%)", styles["Normal"]))
+
     story.append(Spacer(1, 30))
 
     # === OVERALL PERFORMANCE ===
@@ -65,21 +71,42 @@ def generate_pdf_report(evaluation_results, parsed_resume, candidate_name, jd_so
     story.append(metrics_table)
     story.append(Spacer(1, 20))
 
-    # === DETAILED SCORES ===
+    # === DETAILED SCORES WITH DYNAMIC WEIGHTAGE ===
     story.append(Paragraph("Detailed Scores", heading_style))
 
     projects_score = evaluation_results.get("Projects_Score", 0)
     projects_excluded = projects_score == 0.0
 
+    # Use weightage config if provided, otherwise use defaults
+    if weightage_config:
+        exp_pct = weightage_config["experience_weight"]
+        skills_pct = weightage_config["skills_weight"]
+        edu_pct = weightage_config["education_weight"]
+        projects_pct = weightage_config["projects_weight"]
+    else:
+        exp_pct = 30
+        skills_pct = 40
+        edu_pct = 10
+        projects_pct = 20
+
     if projects_excluded:
-        story.append(Paragraph("Note: Projects section excluded from scoring due to insufficient information.", styles["Normal"]))
+        # Calculate redistributed weights
+        total_other = exp_pct + skills_pct + edu_pct
+        exp_adj = exp_pct + (projects_pct * (exp_pct / total_other))
+        skills_adj = skills_pct + (projects_pct * (skills_pct / total_other))
+        edu_adj = edu_pct + (projects_pct * (edu_pct / total_other))
+
+        story.append(Paragraph(f"Note: Projects excluded from scoring. Weights redistributed: Experience: {exp_adj:.1f}%, Skills: {skills_adj:.1f}%, Education: {edu_adj:.1f}%", styles["Normal"]))
         story.append(Spacer(1, 8))
 
-        detailed_data = [["Experience (40%)", "Skills (50%)", "Education (10%)"], [str(evaluation_results.get("Experience_Score", "N/A")), str(evaluation_results.get("Skills_Score", "N/A")), str(evaluation_results.get("Education_Score", "N/A"))]]
+        detailed_data = [
+            [f"Experience ({exp_adj:.1f}%)", f"Skills ({skills_adj:.1f}%)", f"Education ({edu_adj:.1f}%)"],
+            [str(evaluation_results.get("Experience_Score", "N/A")), str(evaluation_results.get("Skills_Score", "N/A")), str(evaluation_results.get("Education_Score", "N/A"))],
+        ]
         detailed_table = Table(detailed_data, colWidths=[2 * inch, 2 * inch, 2 * inch])
     else:
         detailed_data = [
-            ["Experience (30%)", "Skills (40%)", "Education (10%)", "Projects (20%)"],
+            [f"Experience ({exp_pct}%)", f"Skills ({skills_pct}%)", f"Education ({edu_pct}%)", f"Projects ({projects_pct}%)"],
             [str(evaluation_results.get("Experience_Score", "N/A")), str(evaluation_results.get("Skills_Score", "N/A")), str(evaluation_results.get("Education_Score", "N/A")), str(evaluation_results.get("Projects_Score", "N/A"))],
         ]
         detailed_table = Table(detailed_data, colWidths=[1.5 * inch, 1.5 * inch, 1.5 * inch, 1.5 * inch])
