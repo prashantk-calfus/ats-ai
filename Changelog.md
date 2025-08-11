@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [Unreleased]
+## [1.0.2]
 ### Added
 - Added weightage percentage display on frontend.
 - Accepting document uploads.
