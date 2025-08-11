@@ -15,12 +15,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Fixed
 - Placeholder for upcoming fixes.
 
+---
+
+## [1.0.2]
+### Added
+- Added weightage percentage display on frontend.
+- Accepting document uploads.
+- Report generation feature implemented and working.
 
 ---
 
 ## [1.0.1] - 2025-08-06
 ### Added
 - Report download functionality
+
 
 ---
 
