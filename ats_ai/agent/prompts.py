@@ -213,7 +213,7 @@ RESUME_PARSE_PROMPT = """
             {{
               "Certification_Authority": "issuing organization",
               "Certification_Details": "certification name and details"
-            }}
+             }}
             // Add more certification entries as separate objects if present.
           ],
           "Programming_Language": ["list all programming languages mentioned"],

@@ -243,21 +243,44 @@ scheduler = None
 #         scheduler.shutdown()
 #         logger.info("Background scheduler stopped")
 
+#
+# @app.post("/generate_pdf_report", status_code=status.HTTP_200_OK)
+# async def generate_pdf_report_endpoint(report_data: Dict[str, Any]):
+#     """Generate PDF report and return file path"""
+#     try:
+#         evaluation_results = report_data.get("evaluation_results")
+#         parsed_resume = report_data.get("parsed_resume")
+#         candidate_name = report_data.get("candidate_name")
+#         jd_source = report_data.get("jd_source", "Unknown JD")
+#         weightage_config = report_data.get("weightage_config")  # ADD THIS LINE
+#
+#         # Generate PDF with weightage config
+#         pdf_filename = generate_pdf_report(evaluation_results, parsed_resume, candidate_name, jd_source, weightage_config)  # ADD THIS PARAMETER
+#
+#         return {"status": "success", "pdf_path": pdf_filename, "message": "PDF report generated successfully"}
+#
+#     except Exception as e:
+#         logger.error(f"Error generating PDF report: {str(e)}")
+#         raise HTTPException(status_code=500, detail=f"Error generating PDF report: {str(e)}")
+#
+
+BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")  # set to prod URL in deployment
+
 
 @app.post("/generate_pdf_report", status_code=status.HTTP_200_OK)
 async def generate_pdf_report_endpoint(report_data: Dict[str, Any]):
-    """Generate PDF report and return file path"""
     try:
         evaluation_results = report_data.get("evaluation_results")
         parsed_resume = report_data.get("parsed_resume")
         candidate_name = report_data.get("candidate_name")
         jd_source = report_data.get("jd_source", "Unknown JD")
-        weightage_config = report_data.get("weightage_config")  # ADD THIS LINE
+        weightage_config = report_data.get("weightage_config")
 
-        # Generate PDF with weightage config
-        pdf_filename = generate_pdf_report(evaluation_results, parsed_resume, candidate_name, jd_source, weightage_config)  # ADD THIS PARAMETER
+        pdf_filename = generate_pdf_report(evaluation_results, parsed_resume, candidate_name, jd_source, weightage_config)
 
-        return {"status": "success", "pdf_path": pdf_filename, "message": "PDF report generated successfully"}
+        filename = os.path.basename(pdf_filename)
+
+        return {"status": "success", "pdf_path": pdf_filename, "download_url": f"{BASE_URL}/download_report/{filename}", "message": "PDF report generated successfully"}
 
     except Exception as e:
         logger.error(f"Error generating PDF report: {str(e)}")
