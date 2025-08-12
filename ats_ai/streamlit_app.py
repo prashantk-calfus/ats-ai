@@ -807,9 +807,8 @@ if st.session_state.parsed_data_combined:
 
                         if response.status_code == 200:
                             result = response.json()
-                            # pdf_filename = os.path.basename(result["pdf_path"])
-                            # download_url = f"http://localhost:8000/download_report/{pdf_filename}"
-                            download_url = result["download_url"]
+                            pdf_filename = os.path.basename(result["pdf_path"])
+                            download_url = f"http://backend:8000/download_report/{pdf_filename}"
 
                             st.success("✅ PDF Report generated successfully!")
 
