@@ -29,7 +29,8 @@ dependencies = [
     "requests (>=2.32.4,<3.0.0)",
     "reportlab (>=4.4.3,<5.0.0)",
     "starlette (>=0.47.2,<0.48.0)",
-    "pre-commit (>=4.2.0,<5.0.0)"
+    "pre-commit (>=4.2.0,<5.0.0)",
+    "openai (>=1.99.9,<2.0.0)"
 ]
 
 [build-system]

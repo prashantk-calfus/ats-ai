@@ -1,15 +1,17 @@
 import json
 import os
 import re
+from datetime import datetime
 
 from dotenv import load_dotenv
-from google import genai
 from langchain_community.document_loaders import PyMuPDFLoader
+from openai import OpenAI
 from pydantic import BaseModel
 
 from ats_ai.agent.prompts import (
     RESUME_PARSE_PROMPT,
     calculate_weighted_score_and_status,
+    get_dynamic_evaluation_prompt,
 )
 
 """
@@ -21,8 +23,7 @@ from ats_ai.agent.prompts import (
 """
 
 load_dotenv()
-genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-gemini_model = genai.Client()
+openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
 # Define structured schema for parsed resume info
@@ -64,19 +65,394 @@ def extract_json_block(text: str) -> dict:
 
 
 async def extract_resume_info(raw_resume_text: str):
-    """
-    Parsing Agent LLM.
-    Parse information from resume into JSON
-    """
+    """Parse information from resume into JSON"""
     prompt = RESUME_PARSE_PROMPT.format(raw_resume_text=raw_resume_text)
-    response = gemini_model.models.generate_content(model="gemini-2.0-flash", contents=prompt)
 
-    return extract_json_block(response.text)
+    response = openai_client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}], temperature=0.0)
+
+    return extract_json_block(response.choices[0].message.content)
 
 
-async def combined_parse_evaluate(resume_data: str, job_description: str, weightage_config=None):
+# new added
+def get_experience_from_jd_json(jd_json: dict) -> float:
+    """Extract minimum required experience directly from JD JSON field"""
+
+    # Debug: Print the entire JD JSON structure
+    print("=== DEBUG: JD JSON KEYS ===")
+    print("Available keys:", list(jd_json.keys()))
+    print("=== END DEBUG ===")
+
+    # Check if Minimum_Experience exists (exact spelling)
+    if "Minimum_Experience" in jd_json:
+        value = jd_json["Minimum_Experience"]
+        print(f"Found 'Minimum_Experience' with value: '{value}' (type: {type(value)})")
+
+        # Handle different data types
+        if isinstance(value, (int, float)):
+            return float(value)
+        elif isinstance(value, str):
+            # Parse string like "5+ years", "3-5 years", "5", etc.
+            if value.strip().lower() in ["na", "n/a", "", "none", "not specified"]:
+                return 0.0
+
+            # Try to extract number from string
+            import re
+
+            # Look for just numbers first
+            number_match = re.search(r"(\d+(?:\.\d+)?)", value.strip())
+            if number_match:
+                return float(number_match.group(1))
+
+            # If no number found, return 0
+            return 0.0
+    else:
+        print("'Minimum_Experience' key not found in JD JSON")
+
+        # Check for similar keys (case variations, typos)
+        for key in jd_json.keys():
+            if "experience" in key.lower() or "minimum" in key.lower():
+                print(f"Found similar key: '{key}' with value: '{jd_json[key]}'")
+
+    # Fallback
+    return 0.0
+
+
+def calculate_total_experience_years(professional_experience):
+    """
+    Calculate total years of experience from professional experience list
+    Handles various date formats and overlapping positions
+    """
+    if not professional_experience or len(professional_experience) == 0:
+        return 0.0
+
+    experience_periods = []
+    current_year = datetime.now().year
+    current_month = datetime.now().month
+
+    print(f"DEBUG: Current date: {current_month}/{current_year}")
+    print(f"DEBUG: Processing {len(professional_experience)} experience entries")
+
+    for i, exp in enumerate(professional_experience):
+        if isinstance(exp, dict):
+            duration = exp.get("Duration", "")
+            company = exp.get("Company", "Unknown")
+            role = exp.get("Role", "Unknown")
+        elif isinstance(exp, str):
+            duration = exp
+            company = "Unknown"
+            role = "Unknown"
+        else:
+            continue
+
+        if not duration or duration.strip().lower() in ["na", "n/a", ""]:
+            continue
+
+        print(f"DEBUG: Entry {i + 1} - {role} at {company}")
+        print(f"DEBUG: Duration string: '{duration}'")
+
+        # Parse duration string
+        duration_years = parse_duration_to_years(duration, current_year, current_month)
+        print(f"DEBUG: Parsed years: {duration_years}")
+
+        if duration_years > 0:
+            experience_periods.append(duration_years)
+
+    # Sum all experience periods (assuming no overlap for simplicity)
+    total_years = sum(experience_periods)
+    print(f"DEBUG: Individual periods: {experience_periods}")
+    print(f"DEBUG: Total calculated years: {total_years}")
+
+    return round(total_years, 1)
+
+
+def parse_duration_to_years(duration_str, current_year, current_month):
+    """
+    Enhanced parser for duration strings with better handling of explicit durations
+    FIXED: Better Present calculation and month handling
+    """
+    duration_str = duration_str.strip()
+    original_duration = duration_str  # Keep original for debugging
+    duration_str = duration_str.lower()
+
+    print(f"DEBUG: Parsing duration: '{original_duration}'")
+
+    # PRIORITY 1: Handle explicit durations in parentheses first (most reliable)
+    # Pattern: "06/2025 - Present (0.4 years)" or "07/2022 - 05/2025 (2.9 years)"
+    explicit_years = re.search(r"\((\d+(?:\.\d+)?)\s*years?\)", duration_str)
+    if explicit_years:
+        years = float(explicit_years.group(1))
+        print(f"DEBUG: Found explicit years in parentheses: {years}")
+        return years
+
+    explicit_months = re.search(r"\((\d+(?:\.\d+)?)\s*months?\)", duration_str)
+    if explicit_months:
+        months = float(explicit_months.group(1))
+        years = months / 12.0
+        print(f"DEBUG: Found explicit months in parentheses: {months} -> {years} years")
+        return years
+
+    # PRIORITY 2: Handle "Present/Current" cases with date calculation - FIXED
+    present_patterns = [
+        # "06/2025 to Present/Current", "10/2018 - Present" etc.
+        r"(\d{1,2})/(\d{4})\s*(?:[-–—]|to)\s*(?:present|current)",
+        r"(\w+)\s+(\d{4})\s*(?:[-–—]|to)\s*(?:present|current)",
+    ]
+
+    for pattern in present_patterns:
+        match = re.search(pattern, duration_str)
+        if match:
+            if "/" in pattern:
+                start_month = int(match.group(1))
+                start_year = int(match.group(2))
+            else:
+                start_month_str = match.group(1)
+                start_year = int(match.group(2))
+
+                # Convert month name to number
+                month_map = {
+                    "jan": 1,
+                    "january": 1,
+                    "feb": 2,
+                    "february": 2,
+                    "mar": 3,
+                    "march": 3,
+                    "apr": 4,
+                    "april": 4,
+                    "may": 5,
+                    "jun": 6,
+                    "june": 6,
+                    "jul": 7,
+                    "july": 7,
+                    "aug": 8,
+                    "august": 8,
+                    "sep": 9,
+                    "september": 9,
+                    "oct": 10,
+                    "october": 10,
+                    "nov": 11,
+                    "november": 11,
+                    "dec": 12,
+                    "december": 12,
+                }
+                start_month = month_map.get(start_month_str.lower()[:3], 1)
+
+            total_months = (current_year - start_year) * 12 + (current_month - start_month)
+
+            # Add 1 to include the current month
+            total_months += 1
+
+            years = max(total_months / 12.0, 0)
+
+            print(f"DEBUG: Present calculation - Start: {start_month}/{start_year}, Current: {current_month}/{current_year}")
+            print(f"DEBUG: Years diff: {current_year - start_year}, Months diff: {current_month - start_month}")
+            print(f"DEBUG: Total months (including current): {total_months}, Years: {years}")
+            return years
+
+    # PRIORITY 3: Handle completed date ranges - IMPROVED
+    completed_patterns = [
+        # "07/2022 - 05/2025", "08/2016 - 10/2018", "07/2022 to 05/2025"
+        r"(\d{1,2})/(\d{4})\s*(?:[-–—]|to)\s*(\d{1,2})/(\d{4})",
+        r"(\w+)\s+(\d{4})\s*(?:[-–—]|to)\s*(\w+)\s+(\d{4})",
+    ]
+
+    for pattern in completed_patterns:
+        match = re.search(pattern, duration_str)
+        if match:
+            if "/" in pattern:
+                start_month = int(match.group(1))
+                start_year = int(match.group(2))
+                end_month = int(match.group(3))
+                end_year = int(match.group(4))
+            else:
+                start_month_str = match.group(1)
+                start_year = int(match.group(2))
+                end_month_str = match.group(3)
+                end_year = int(match.group(4))
+
+                month_map = {
+                    "jan": 1,
+                    "january": 1,
+                    "feb": 2,
+                    "february": 2,
+                    "mar": 3,
+                    "march": 3,
+                    "apr": 4,
+                    "april": 4,
+                    "may": 5,
+                    "jun": 6,
+                    "june": 6,
+                    "jul": 7,
+                    "july": 7,
+                    "aug": 8,
+                    "august": 8,
+                    "sep": 9,
+                    "september": 9,
+                    "oct": 10,
+                    "october": 10,
+                    "nov": 11,
+                    "november": 11,
+                    "dec": 12,
+                    "december": 12,
+                }
+                start_month = month_map.get(start_month_str.lower()[:3], 1)
+                end_month = month_map.get(end_month_str.lower()[:3], 1)
+
+            # IMPROVED: Calculate total months including both start and end months
+            total_months = (end_year - start_year) * 12 + (end_month - start_month) + 1
+            years = max(total_months / 12.0, 0)
+
+            print(f"DEBUG: Date range calculation - Start: {start_month}/{start_year}, End: {end_month}/{end_year}")
+            print(f"DEBUG: Total months (inclusive): {total_months}, Years: {years}")
+            return years
+
+    # PRIORITY 4: Simple year ranges like "2023 - 2024"
+    year_range = re.search(r"(\d{4})\s*(?:[-–—]|to)\s*(\d{4})", duration_str)
+    if year_range:
+        start_year = int(year_range.group(1))
+        end_year = int(year_range.group(2))
+        years = max(end_year - start_year + 1, 0)  # +1 for inclusive years
+        print(f"DEBUG: Year range: {start_year}-{end_year} -> {years} years")
+        return years
+
+    # FALLBACK: Only as last resort and with better validation
+    print(f"DEBUG: No date patterns matched, trying fallback extraction for: '{original_duration}'")
+
+    # Look for reasonable year numbers but NOT part of dates
+    # Avoid matching things like "06/2025" by requiring word boundaries or specific contexts
+    fallback_patterns = [
+        r"\b(\d+(?:\.\d+)?)\s*years?\b",  # "3.5 years", "2 years"
+        r"\b(\d+(?:\.\d+)?)\s*yrs?\b",  # "3 yrs", "2.5 yr"
+    ]
+
+    for pattern in fallback_patterns:
+        matches = re.findall(pattern, duration_str)
+        if matches:
+            for num_str in matches:
+                val = float(num_str)
+                if 0.1 <= val <= 50:  # Reasonable range for years
+                    print(f"DEBUG: Fallback found explicit years mention: {val}")
+                    return val
+
+    # If still no match, look for month mentions
+    month_patterns = [
+        r"\b(\d+(?:\.\d+)?)\s*months?\b",
+        r"\b(\d+(?:\.\d+)?)\s*mos?\b",
+    ]
+
+    for pattern in month_patterns:
+        matches = re.findall(pattern, duration_str)
+        if matches:
+            for num_str in matches:
+                val = float(num_str)
+                if 1 <= val <= 600:  # 1 month to 50 years in months
+                    years = val / 12.0
+                    print(f"DEBUG: Fallback found months: {val} -> {years} years")
+                    return years
+
+    print(f"DEBUG: No valid duration found in: '{original_duration}'")
+    return 0.0
+
+
+# Test function to verify the fix
+def test_experience_calculation():
+    """Test function to verify the experience calculation"""
+    test_experiences = [{"Duration": "July 2022 – May 2025", "Company": "Company A", "Role": "Developer"}, {"Duration": "June 2025 – Present", "Company": "Company d", "Role": "Senior Developer"}]
+
+    total_years = calculate_total_experience_years(test_experiences)
+    print(f"\nFINAL RESULT: Total Experience = {total_years} years")
+    return total_years
+
+
+experience = test_experience_calculation()
+print(f"The calculated experience is: {experience}")
+
+
+def extract_jd_required_experience(jd_json):
+    """
+    Extract required experience from JD JSON in various formats
+    Returns minimum required years as float
+    """
+
+    # Check various possible keys where experience might be stored
+    possible_keys = ["minimum_experience", "Minimum_Experience"]
+
+    experience_text = ""
+
+    # Search through different sections of JD
+    for key in possible_keys:
+        if key in jd_json:
+            value = jd_json[key]
+            if isinstance(value, str):
+                experience_text += " " + value.lower()
+            elif isinstance(value, list):
+                experience_text += " " + " ".join([str(item).lower() for item in value])
+            elif isinstance(value, dict):
+                for subkey, subvalue in value.items():
+                    if "experience" in subkey.lower():
+                        experience_text += " " + str(subvalue).lower()
+
+    # Also check in job description text if available
+    if "job_description" in jd_json:
+        experience_text += " " + str(jd_json["job_description"]).lower()
+
+    if "description" in jd_json:
+        experience_text += " " + str(jd_json["description"]).lower()
+
+    # Parse experience requirements from text
+    return parse_experience_requirement(experience_text)
+
+
+def parse_experience_requirement(text):
+    """
+    Parse experience requirement text and extract minimum years
+    """
+    import re
+
+    text = text.lower().strip()
+    if not text:
+        return 0.0
+
+    # Patterns to match experience requirements
+    patterns = [
+        # "5+ years", "5 + years", "minimum 5 years"
+        r"(?:minimum|min|at least|atleast)\s*(\d+)(?:\+|\s*plus)?\s*years?",
+        r"(\d+)\s*\+\s*years?",
+        r"(\d+)\s*plus\s*years?",
+        # "5-7 years", "5 to 7 years"
+        r"(\d+)(?:\s*[-–]\s*\d+|\s+to\s+\d+)\s*years?",
+        # "5 years experience"
+        r"(\d+)\s*years?\s*(?:of\s*)?(?:experience|exp)",
+        # "experience: 5 years"
+        r"experience:?\s*(\d+)\s*years?",
+        # Handle ranges like "2-3 years" - take the minimum
+        r"(\d+)[-–](\d+)\s*years?",
+    ]
+
+    for pattern in patterns:
+        matches = re.findall(pattern, text)
+        if matches:
+            # Take the first match (usually the minimum requirement)
+            if isinstance(matches[0], tuple):
+                # For range patterns, take the minimum
+                return float(min(matches[0]))
+            else:
+                return float(matches[0])
+
+    # Fallback: look for any mention of years
+    year_matches = re.findall(r"(\d+)\s*years?", text)
+    if year_matches:
+        # Return the smallest reasonable number (likely minimum requirement)
+        years = [float(y) for y in year_matches if 1 <= float(y) <= 20]
+        if years:
+            return min(years)
+
+    return 0.0
+
+
+async def combined_parse_evaluate(resume_data: str, job_description: dict, weightage_config=None):
     """
     Parse and Evaluate Candidate resume with Job Description with custom weightage
+    Enhanced with experience years calculation and qualification logic
     - returns Dict[str, Any]: JSON object containing evaluation and parsed result
     """
     # Use default weightage if not provided
@@ -91,32 +467,119 @@ async def combined_parse_evaluate(resume_data: str, job_description: str, weight
 
         weightage_config = DefaultWeightageConfig()
 
-    # Import the dynamic prompt function
-    from ats_ai.agent.prompts import get_dynamic_evaluation_prompt
+    # Generate enhanced prompt with experience calculation
+    prompt = get_dynamic_evaluation_prompt(resume_data, job_description, weightage_config)
 
-    # Generate dynamic prompt with custom weightage
-    prompt = get_dynamic_evaluation_prompt(resume_data, job_description, weightage_config, k_runs=3, temperature=0.0, top_p=0.9)
-    response = gemini_model.models.generate_content(model="gemini-2.0-flash", contents=prompt)
+    response = openai_client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}], temperature=0.0, top_p=0.9)
 
-    # Parse the initial response to get individual scores
-    parsed_response = extract_json_block(response.text)
+    print("=== RAW RESPONSE ===")
+    print(response.choices[0].message.content)
+    print("=== END RAW RESPONSE ===")
 
-    # Extract individual scores from LLM response
-    experience_score = parsed_response["Evaluation"]["Experience_Score"]
-    skills_score = parsed_response["Evaluation"]["Skills_Score"]
-    education_score = parsed_response["Evaluation"]["Education_Score"]
-    projects_score = parsed_response["Evaluation"]["Projects_Score"]
+    # Parse the initial response to get individual scores and experience data
+    parsed_response = extract_json_block(response.choices[0].message.content)
+
+    print("=== PARSED RESPONSE ===")
+    print(json.dumps(parsed_response, indent=2))
+    print("=== END PARSED RESPONSE ===")
+
+    #
+    # # ADD THIS OVERRIDE SNIPPET HERE:
+    # if "Parsed_Resume" in parsed_response:
+    #     professional_experience = parsed_response["Parsed_Resume"].get("Professional_Experience", [])
+    #     calculated_experience = calculate_total_experience_years(professional_experience)
+    #     parsed_response["Parsed_Resume"]["Total_Experience"] = calculated_experience
+    #     print(f"=== OVERRIDE: Added Total_Experience = {calculated_experience} to Parsed_Resume ===")
+
+    # Extract experience information from LLM response and validate with our functions
+    try:
+        if "Evaluation" in parsed_response:
+            evaluation = parsed_response["Evaluation"]
+            # Get LLM's calculation
+            evaluation.get("Total_Experience_Years", 0.0)
+            llm_jd_required_experience = evaluation.get("JD_Required_Experience_Years", 0.0)
+
+            experience_score = evaluation["Experience_Score"]
+            skills_score = evaluation["Skills_Score"]
+            education_score = evaluation["Education_Score"]
+            projects_score = evaluation["Projects_Score"]
+
+            # Replace this entire experience calculation block:
+            if "Parsed_Resume" in parsed_response:
+                resume_experience = parsed_response["Parsed_Resume"].get("Professional_Experience", [])
+                candidate_total_experience = calculate_total_experience_years(resume_experience)
+                print(f"Using our calculated experience: {candidate_total_experience} years")
+            else:
+                candidate_total_experience = 0.0
+                print("No resume data found, using 0.0 years")
+
+            # Ignore LLM calculation completely for now
+
+            # Validate JD requirement extraction
+            calculated_jd_requirement = get_experience_from_jd_json(job_description)
+            if abs(calculated_jd_requirement - llm_jd_required_experience) > 0.5:
+                print(f"JD requirement differs: LLM={llm_jd_required_experience}, Calculated={calculated_jd_requirement}")
+                jd_required_experience = calculated_jd_requirement
+            else:
+                jd_required_experience = llm_jd_required_experience
+
+        else:
+            # Fallback to our own calculations if LLM didn't provide experience data
+            print("LLM didn't provide experience data, calculating ourselves...")
+            candidate_total_experience = 0.0
+            jd_required_experience = extract_jd_required_experience(job_description)
+            experience_score = parsed_response.get("Experience_Score", 0.0)
+            skills_score = parsed_response.get("Skills_Score", 0.0)
+            education_score = parsed_response.get("Education_Score", 0.0)
+            projects_score = parsed_response.get("Projects_Score", 0.0)
+
+            # Try to calculate from parsed resume if available
+            if "Parsed_Resume" in parsed_response:
+                resume_experience = parsed_response["Parsed_Resume"].get("Professional_Experience", [])
+                candidate_total_experience = calculate_total_experience_years(resume_experience)
+
+    except KeyError as e:
+        print(f"KeyError accessing scores: {e}")
+        print(f"Available keys in parsed_response: {list(parsed_response.keys())}")
+
+        # Fallback values with our own calculations
+        candidate_total_experience = 0.0
+        jd_required_experience = get_experience_from_jd_json(job_description)
+        experience_score = 0.0
+        skills_score = 0.0
+        education_score = 0.0
+        projects_score = 0.0
 
     # Determine if projects are valid based on parsed resume data
-    projects = parsed_response["Parsed_Resume"]["Projects"]
-    has_valid_projects = len(projects) > 0 and projects[0]["Title"] not in ["NA", "N/A", "", None] and projects[0]["Description"] not in ["NA", "N/A", "", None] and len(projects[0]["Description"]) > 10
+    try:
+        if "Parsed_Resume" in parsed_response:
+            projects = parsed_response["Parsed_Resume"].get("Projects", [])
+        else:
+            projects = parsed_response.get("Projects", [])
+    except (KeyError, TypeError):
+        projects = []
 
-    # Calculate weighted scores using the function with custom weights
+    # Check if projects are valid
+    has_valid_projects = False
+    if projects and len(projects) > 0:
+        if isinstance(projects[0], dict):
+            # Dictionary format: {"Title": "...", "Description": "..."}
+            first_project = projects[0]
+            title = first_project.get("Title", first_project.get("Project_Name", ""))
+            description = first_project.get("Description", first_project.get("Project_Description", ""))
+            has_valid_projects = title not in ["NA", "N/A", "", None] and description not in ["NA", "N/A", "", None] and len(str(description)) > 10
+        elif isinstance(projects[0], str):
+            # String format: direct project names
+            has_valid_projects = projects[0] not in ["NA", "N/A", "", None] and len(projects[0]) > 10
+
+    # Use enhanced calculation that includes experience years comparison
     calculation_result = calculate_weighted_score_and_status(
         experience_score=experience_score,
         skills_score=skills_score,
         education_score=education_score,
         projects_score=projects_score,
+        candidate_total_experience_years=candidate_total_experience,
+        jd_required_experience_years=jd_required_experience,
         has_valid_projects=has_valid_projects,
         experience_weight=weightage_config.experience_weight,
         skills_weight=weightage_config.skills_weight,
@@ -124,9 +587,44 @@ async def combined_parse_evaluate(resume_data: str, job_description: str, weight
         projects_weight=weightage_config.projects_weight,
     )
 
-    # Update the response with calculated values
-    parsed_response["Evaluation"]["Overall_Weighted_Score"] = calculation_result["overall_weighted_score"]
-    parsed_response["Evaluation"]["Match_Percentage"] = calculation_result["match_percentage"]
-    parsed_response["Evaluation"]["Qualification Status"] = calculation_result["qualification_status"]
+    # print(f"=== EXPERIENCE CALCULATION ===")
+    # print(f"Candidate Experience: {candidate_total_experience} years")
+    # print(f"JD Required Experience: {jd_required_experience} years")
+    # print(f"Experience Gap: {calculation_result.get('experience_gap', False)}")
+    # print(f"Qualification Status: {calculation_result['qualification_status']}")
+    # print("=== END EXPERIENCE CALCULATION ===")
 
-    return parsed_response
+    # Create a standardized response structure
+    if "Evaluation" not in parsed_response:
+        # If the response doesn't have the nested structure, create it
+        evaluation_data = {
+            "Total_Experience_Years": candidate_total_experience,
+            "JD_Required_Experience_Years": jd_required_experience,
+            "Experience_Score": experience_score,
+            "Skills_Score": skills_score,
+            "Education_Score": education_score,
+            "Projects_Score": projects_score,
+            "Overall_Weighted_Score": calculation_result["overall_weighted_score"],
+            "Match_Percentage": calculation_result["match_percentage"],
+            "Qualification Status": calculation_result["qualification_status"],
+            "Pros": parsed_response.get("Pros", []),
+            "Cons": parsed_response.get("Cons", []),
+            "Skills Match": parsed_response.get("Skills Match", parsed_response.get("Skills_Match", [])),
+            "Required_Skills_Missing_from_Resume": parsed_response.get("Required_Skills_Missing_from_Resume", []),
+            "Extra skills": parsed_response.get("Extra skills", parsed_response.get("Extra_Skills", [])),
+            "Summary": parsed_response.get("Summary", ""),
+        }
+
+        # Create the standardized response structure
+        standardized_response = {"Evaluation": evaluation_data, "Parsed_Resume": parsed_response.get("Parsed_Resume", {})}
+
+        return standardized_response
+    else:
+        # Update the existing nested structure with calculated values and experience info
+        parsed_response["Evaluation"]["Total_Experience_Years"] = candidate_total_experience
+        parsed_response["Evaluation"]["JD_Required_Experience_Years"] = jd_required_experience
+        parsed_response["Evaluation"]["Overall_Weighted_Score"] = calculation_result["overall_weighted_score"]
+        parsed_response["Evaluation"]["Match_Percentage"] = calculation_result["match_percentage"]
+        parsed_response["Evaluation"]["Qualification Status"] = calculation_result["qualification_status"]
+
+        return parsed_response

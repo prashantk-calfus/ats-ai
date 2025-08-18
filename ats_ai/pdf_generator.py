@@ -2,6 +2,7 @@ import os
 from datetime import datetime
 
 from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
@@ -48,11 +49,49 @@ def generate_pdf_report(evaluation_results, parsed_resume, candidate_name, jd_so
     match_percentage = evaluation_results.get("Match_Percentage", "N/A")
     qualification_status = evaluation_results.get("Qualification Status", "N/A")
 
-    # Simple metrics table with adjusted column widths
-    metrics_data = [["Overall Score (0-10)", "Match with JD", "Status"], [str(overall_score), f"{match_percentage}%", str(qualification_status)]]
+    # # Simple metrics table with adjusted column widths
+    # metrics_data = [["Overall Score (0-10)", "Match with JD", "Status"],
+    #                 [str(overall_score), f"{match_percentage}%", str(qualification_status)]]
+    #
+    # # Adjusted column widths - make Status column wider
+    # metrics_table = Table(metrics_data, colWidths=[1.8 * inch, 1.7 * inch, 2.5 * inch])
+    # metrics_table.setStyle(
+    #     TableStyle(
+    #         [
+    #             ("BACKGROUND", (0, 0), (-1, 0), colors.lightblue),
+    #             ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+    #             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+    #             ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+    #             ("FONTSIZE", (0, 0), (-1, -1), 11),
+    #             ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+    #             ("TOPPADDING", (0, 0), (-1, -1), 10),
+    #             ("GRID", (0, 0), (-1, -1), 1, colors.black),
+    #         ]
+    #     )
+    # )
+    #
+    # story.append(metrics_table)
+    # story.append(Spacer(1, 20))
+    table_text_style = ParagraphStyle(
+        "TableText",
+        parent=styles["Normal"],
+        fontSize=10,
+        alignment=TA_CENTER,
+        wordWrap="CJK",  # allows wrapping in table cells
+    )
 
-    # Adjusted column widths - make Status column wider
-    metrics_table = Table(metrics_data, colWidths=[1.8 * inch, 1.7 * inch, 2.5 * inch])
+    # Use Paragraph instead of str for wrapping
+    overall_score_p = Paragraph(str(overall_score), table_text_style)
+    match_percentage_p = Paragraph(f"{match_percentage}", table_text_style)
+    qualification_status_p = Paragraph(str(qualification_status), table_text_style)
+
+    metrics_data = [
+        ["Overall Score (0-10)", "Match with JD", "Status"],
+        [overall_score_p, match_percentage_p, qualification_status_p],
+    ]
+
+    # Adjust widths (make Status wider)
+    metrics_table = Table(metrics_data, colWidths=[1.5 * inch, 1.5 * inch, 3.5 * inch])
     metrics_table.setStyle(
         TableStyle(
             [
@@ -60,7 +99,7 @@ def generate_pdf_report(evaluation_results, parsed_resume, candidate_name, jd_so
                 ("ALIGN", (0, 0), (-1, -1), "CENTER"),
                 ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                 ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 0), (-1, -1), 11),
+                ("FONTSIZE", (0, 0), (-1, -1), 10),
                 ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
                 ("TOPPADDING", (0, 0), (-1, -1), 10),
                 ("GRID", (0, 0), (-1, -1), 1, colors.black),
@@ -70,6 +109,61 @@ def generate_pdf_report(evaluation_results, parsed_resume, candidate_name, jd_so
 
     story.append(metrics_table)
     story.append(Spacer(1, 20))
+
+    # === NEW: EXPERIENCE ANALYSIS SECTION ===
+    candidate_exp = evaluation_results.get("Total_Experience_Years", 0)
+    required_exp = evaluation_results.get("JD_Required_Experience_Years", 0)
+    evaluation_results.get("Experience_Gap", 0)
+
+    if candidate_exp is not None and required_exp is not None:
+        story.append(Paragraph("Experience Analysis", heading_style))
+
+        # Experience metrics table
+        exp_data = [["Candidate Experience", "Required Experience", "Gap Analysis"], [f"{candidate_exp} years", f"{required_exp}+ years" if required_exp > 0 else "No minimum specified", ""]]
+
+        # Determine gap analysis text and color
+        if required_exp > 0:
+            if candidate_exp >= required_exp:
+                gap = candidate_exp - required_exp
+                gap_text = f"Meets requirement\n (+{gap:.1f} years)"
+                gap_color = colors.green
+            else:
+                gap = required_exp - candidate_exp
+                gap_text = f"Experience Gap\n (-{gap:.1f} years)"
+                gap_color = colors.red
+        else:
+            gap_text = "No minimum experience required"
+            gap_color = colors.blue
+
+        exp_data[1][2] = gap_text
+
+        exp_table = Table(exp_data, colWidths=[2 * inch, 2 * inch, 2 * inch])
+        exp_table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
+                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 10),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+                    ("TOPPADDING", (0, 0), (-1, -1), 10),
+                    ("GRID", (0, 0), (-1, -1), 1, colors.black),
+                    ("TEXTCOLOR", (2, 1), (2, 1), gap_color),
+                ]
+            )
+        )
+
+        story.append(exp_table)
+
+        # Experience Gap Warning if applicable
+        if required_exp > 0 and candidate_exp < required_exp:
+            gap = required_exp - candidate_exp
+            warning_style = ParagraphStyle("Warning", parent=styles["Normal"], textColor=colors.red, fontName="Helvetica-Bold")
+            story.append(Spacer(1, 10))
+            story.append(Paragraph(f"Experience Disqualification: Candidate has {gap:.1f} years less than the minimum required experience.", warning_style))
+
+        story.append(Spacer(1, 20))
 
     # === DETAILED SCORES WITH DYNAMIC WEIGHTAGE ===
     story.append(Paragraph("Detailed Scores", heading_style))
@@ -146,8 +240,29 @@ def generate_pdf_report(evaluation_results, parsed_resume, candidate_name, jd_so
     story.append(Paragraph("Weaknesses:", subheading_style))
     cons = evaluation_results.get("Cons", [])
     if cons:
-        for weakness in cons:
-            story.append(Paragraph(f"• {weakness}", styles["Normal"]))
+        # Separate experience-related cons from others (matching Streamlit logic)
+        experience_cons = []
+        other_cons = []
+
+        for c in cons:
+            if any(keyword in c.lower() for keyword in ["experience", "years", "senior", "junior"]):
+                experience_cons.append(c)
+            else:
+                other_cons.append(c)
+
+        # Display experience cons first and prominently
+        if experience_cons:
+            story.append(Paragraph("•Experience Issues:", subheading_style))
+            for exp_con in experience_cons:
+                story.append(Paragraph(f" {exp_con}", styles["Normal"]))
+            story.append(Spacer(1, 8))
+
+        # Then display other cons
+        if other_cons:
+            if experience_cons:  # Only add header if we had experience cons
+                story.append(Paragraph("Other Areas for Improvement:", subheading_style))
+            for other_con in other_cons:
+                story.append(Paragraph(f"• {other_con}", styles["Normal"]))
     else:
         story.append(Paragraph("• No specific weaknesses identified.", styles["Normal"]))
 
@@ -211,13 +326,15 @@ def generate_pdf_report(evaluation_results, parsed_resume, candidate_name, jd_so
         education_entries = parsed_resume.get("Education", [])
         if education_entries:
             for edu in education_entries:
-                degree = edu.get("Degree", "N/A")
-                institution = edu.get("Institution", "N/A")
-                story.append(Paragraph(f"• {degree} at {institution}", styles["Normal"]))
-
-                score = edu.get("Score", "N/A")
-                duration = edu.get("Duration", "N/A")
-                story.append(Paragraph(f"  Score: {score}, Duration: {duration}", styles["Normal"]))
+                if isinstance(edu, dict):
+                    degree = edu.get("Degree", "N/A")
+                    institution = edu.get("Institution", "N/A")
+                    score = edu.get("Score", "N/A")
+                    duration = edu.get("Duration", "N/A")
+                    story.append(Paragraph(f"• {degree} at {institution}", styles["Normal"]))
+                    story.append(Paragraph(f"  Score: {score}, Duration: {duration}", styles["Normal"]))
+                elif isinstance(edu, str):
+                    story.append(Paragraph(f"• {edu}", styles["Normal"]))
                 story.append(Spacer(1, 5))
         else:
             story.append(Paragraph("No education details provided.", styles["Normal"]))
@@ -229,19 +346,22 @@ def generate_pdf_report(evaluation_results, parsed_resume, candidate_name, jd_so
         experience_entries = parsed_resume.get("Professional_Experience", [])
         if experience_entries:
             for exp in experience_entries:
-                role = exp.get("Role", "N/A")
-                company = exp.get("Company", "N/A")
-                duration = exp.get("Duration", "N/A")
+                if isinstance(exp, dict):
+                    role = exp.get("Role", "N/A")
+                    company = exp.get("Company", "N/A")
+                    duration = exp.get("Duration", "N/A")
+                    description = exp.get("Description", "N/A")
 
-                story.append(Paragraph(f"• {role} at {company}", styles["Normal"]))
-                story.append(Paragraph(f"  Duration: {duration}", styles["Normal"]))
+                    story.append(Paragraph(f"• {role} at {company}", styles["Normal"]))
+                    story.append(Paragraph(f"  Duration: {duration}", styles["Normal"]))
 
-                description = exp.get("Description", "N/A")
-                if description and description.strip().lower() not in ["na", "n/a"]:
-                    # Split long descriptions into readable chunks
-                    if len(description) > 500:
-                        description = description[:500] + "..."
-                    story.append(Paragraph(f"  Description: {description}", styles["Normal"]))
+                    if description and description.strip().lower() not in ["na", "n/a"]:
+                        # Split long descriptions into readable chunks
+                        if len(description) > 500:
+                            description = description[:500] + "..."
+                        story.append(Paragraph(f"  Description: {description}", styles["Normal"]))
+                elif isinstance(exp, str):
+                    story.append(Paragraph(f"• {exp}", styles["Normal"]))
                 story.append(Spacer(1, 8))
         else:
             story.append(Paragraph("No professional experience details provided.", styles["Normal"]))
@@ -255,25 +375,38 @@ def generate_pdf_report(evaluation_results, parsed_resume, candidate_name, jd_so
         has_valid_projects = False
         if project_entries:
             for proj in project_entries:
-                project_name = proj.get("Project_Name", proj.get("Title", "")).strip()
-                if project_name and project_name.upper() not in ["NA", "N/A", ""]:
-                    has_valid_projects = True
-                    break
+                if isinstance(proj, dict):
+                    project_name = proj.get("Project_Name", proj.get("Title", "")).strip()
+                    if project_name and project_name.upper() not in ["NA", "N/A", ""]:
+                        has_valid_projects = True
+                        break
+                elif isinstance(proj, str):
+                    if proj.strip() and proj.strip().upper() not in ["NA", "N/A", ""]:
+                        has_valid_projects = True
+                        break
 
         if has_valid_projects:
             for proj in project_entries:
-                project_name = proj.get("Project_Name", proj.get("Title", "N/A"))
-                if project_name.upper() not in ["NA", "N/A"]:
-                    story.append(Paragraph(f"• Project: {project_name}", styles["Normal"]))
-                    description = proj.get("Project_Description", proj.get("Description", "N/A"))
-                    if description and description.strip().lower() not in ["na", "n/a"]:
-                        # Limit description length for readability
-                        if len(description) > 300:
-                            description = description[:300] + "..."
-                        story.append(Paragraph(f"  Description: {description}", styles["Normal"]))
-                    story.append(Spacer(1, 5))
+                if isinstance(proj, dict):
+                    project_name = proj.get("Project_Name", proj.get("Title", "N/A"))
+                    if project_name.upper() not in ["NA", "N/A"]:
+                        story.append(Paragraph(f" Project: {project_name}", styles["Normal"]))
+                        description = proj.get("Project_Description", proj.get("Description", "N/A"))
+                        technologies = proj.get("Technologies", [])
+                        if description and description.strip().lower() not in ["na", "n/a"]:
+                            # Limit description length for readability
+                            if len(description) > 300:
+                                description = description[:300] + "..."
+                            story.append(Paragraph(f"  Description: {description}", styles["Normal"]))
+                        if technologies and isinstance(technologies, list) and len(technologies) > 0:
+                            tech_str = ", ".join(technologies)
+                            story.append(Paragraph(f"  Technologies: {tech_str}", styles["Normal"]))
+                elif isinstance(proj, str):
+                    if proj.strip().upper() not in ["NA", "N/A"]:
+                        story.append(Paragraph(f"• Project: {proj}", styles["Normal"]))
+                story.append(Spacer(1, 5))
         else:
-            story.append(Paragraph("No project details provided.", styles["Normal"]))
+            story.append(Paragraph("No project details provided. (Projects section excluded from scoring)", styles["Normal"]))
 
         story.append(Spacer(1, 15))
 
@@ -282,7 +415,18 @@ def generate_pdf_report(evaluation_results, parsed_resume, candidate_name, jd_so
         certification_entries = parsed_resume.get("Certifications", [])
         if certification_entries and len(certification_entries) > 0:
             for cert in certification_entries:
-                story.append(Paragraph(f"• {cert}", styles["Normal"]))
+                if isinstance(cert, dict):
+                    cert_authority = cert.get("Certification_Authority", "N/A")
+                    cert_details = cert.get("Certification_Details", "N/A")
+                    if cert_authority != "N/A" and cert_details != "N/A":
+                        story.append(Paragraph(f"• {cert_details} from {cert_authority}", styles["Normal"]))
+                    elif cert_details != "N/A":
+                        story.append(Paragraph(f"• {cert_details}", styles["Normal"]))
+                    else:
+                        story.append(Paragraph(f"• {str(cert)}", styles["Normal"]))
+                elif isinstance(cert, str):
+                    if cert.strip() and cert.strip().upper() not in ["NA", "N/A"]:
+                        story.append(Paragraph(f"• {cert}", styles["Normal"]))
         else:
             story.append(Paragraph("No certifications provided.", styles["Normal"]))
 
@@ -296,19 +440,28 @@ def generate_pdf_report(evaluation_results, parsed_resume, candidate_name, jd_so
 
         if programming_languages:
             story.append(Paragraph("Programming Languages:", styles["Normal"]))
-            lang_text = ", ".join(programming_languages)
+            if isinstance(programming_languages, list):
+                lang_text = ", ".join(programming_languages)
+            else:
+                lang_text = str(programming_languages)
             story.append(Paragraph(lang_text, styles["Normal"]))
             story.append(Spacer(1, 8))
 
         if frameworks:
             story.append(Paragraph("Frameworks:", styles["Normal"]))
-            framework_text = ", ".join(frameworks)
+            if isinstance(frameworks, list):
+                framework_text = ", ".join(frameworks)
+            else:
+                framework_text = str(frameworks)
             story.append(Paragraph(framework_text, styles["Normal"]))
             story.append(Spacer(1, 8))
 
         if technologies:
             story.append(Paragraph("Technologies:", styles["Normal"]))
-            tech_text = ", ".join(technologies)
+            if isinstance(technologies, list):
+                tech_text = ", ".join(technologies)
+            else:
+                tech_text = str(technologies)
             story.append(Paragraph(tech_text, styles["Normal"]))
             story.append(Spacer(1, 8))
 
