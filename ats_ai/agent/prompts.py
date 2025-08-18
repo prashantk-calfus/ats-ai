@@ -256,17 +256,7 @@ RESUME_PARSE_PROMPT = """
 
 
 def calculate_weighted_score_and_status(
-    experience_score,
-    skills_score,
-    education_score,
-    projects_score,
-    candidate_total_experience_years,
-    jd_required_experience_years,
-    has_valid_projects=True,
-    experience_weight=0.3,
-    skills_weight=0.4,
-    education_weight=0.1,
-    projects_weight=0.2,
+    experience_score, skills_score, education_score, projects_score, candidate_total_experience_years, jd_required_experience_years, has_valid_projects=True, experience_weight=0.3, skills_weight=0.4, education_weight=0.1, projects_weight=0.2
 ):
     """
     Enhanced calculation with explicit experience years comparison
