@@ -256,18 +256,25 @@ RESUME_PARSE_PROMPT = """
 
 
 def calculate_weighted_score_and_status(
-    experience_score, skills_score, education_score, projects_score, candidate_total_experience_years, jd_required_experience_years, has_valid_projects=True, experience_weight=0.3, skills_weight=0.4, education_weight=0.1, projects_weight=0.2
+    experience_score,
+    skills_score,
+    education_score,
+    projects_score,
+    candidate_total_experience_years,
+    jd_required_experience_years,
+    has_valid_projects=True,
+    experience_weight=0.3,
+    skills_weight=0.4,
+    education_weight=0.1,
+    projects_weight=0.2,
+    llm_match_percentage=None,
 ):
-    """
-    Enhanced calculation with explicit experience years comparison
-    """
 
     # CRITICAL: Check experience requirement FIRST
     if jd_required_experience_years > 0 and candidate_total_experience_years < jd_required_experience_years:
-        # If candidate doesn't meet minimum experience, they are disqualified
         qualification_status = f"Not Qualified - Experience Gap (Required: {jd_required_experience_years}+ years, Has: {candidate_total_experience_years} years)"
 
-        # Still calculate the weighted score for completeness
+        # Calculate weighted score normally
         if not has_valid_projects or projects_score == 0.0:
             total_other_weights = experience_weight + skills_weight + education_weight
             if total_other_weights > 0:
@@ -278,13 +285,14 @@ def calculate_weighted_score_and_status(
                 exp_adjusted = experience_weight
                 skills_adjusted = skills_weight
                 edu_adjusted = education_weight
-
             overall_weighted_score = (experience_score * exp_adjusted) + (skills_score * skills_adjusted) + (education_score * edu_adjusted)
         else:
             overall_weighted_score = (experience_score * experience_weight) + (skills_score * skills_weight) + (projects_score * projects_weight) + (education_score * education_weight)
 
         overall_weighted_score = round(overall_weighted_score, 1)
-        match_percentage = f"{overall_weighted_score * 10.0:.1f}%"
+
+        # USE LLM MATCH PERCENTAGE DIRECTLY - no fallback calculation
+        match_percentage = llm_match_percentage if llm_match_percentage else "0.0%"
 
         return {
             "overall_weighted_score": overall_weighted_score,
@@ -295,10 +303,9 @@ def calculate_weighted_score_and_status(
             "candidate_experience": candidate_total_experience_years,
         }
 
-    # Dynamic weight calculation based on project validity and custom weights
+    # Calculate weighted score normally
     if not has_valid_projects or projects_score == 0.0:
         total_other_weights = experience_weight + skills_weight + education_weight
-
         if total_other_weights > 0:
             exp_adjusted = experience_weight + (projects_weight * (experience_weight / total_other_weights))
             skills_adjusted = skills_weight + (projects_weight * (skills_weight / total_other_weights))
@@ -307,20 +314,26 @@ def calculate_weighted_score_and_status(
             exp_adjusted = experience_weight
             skills_adjusted = skills_weight
             edu_adjusted = education_weight
-
         overall_weighted_score = (experience_score * exp_adjusted) + (skills_score * skills_adjusted) + (education_score * edu_adjusted)
     else:
         overall_weighted_score = (experience_score * experience_weight) + (skills_score * skills_weight) + (projects_score * projects_weight) + (education_score * education_weight)
 
     overall_weighted_score = round(overall_weighted_score, 1)
-    match_percentage = f"{overall_weighted_score * 10.0:.1f}%"
-    match_percentage_numeric = overall_weighted_score * 10.0
 
-    # Determine qualification status based on overall score
+    # USE LLM MATCH PERCENTAGE DIRECTLY
+    match_percentage = llm_match_percentage if llm_match_percentage else "0.0%"
+
+    # Extract numeric value for qualification determination
+    try:
+        match_percentage_numeric = float(match_percentage.replace("%", ""))
+    except Exception:
+        match_percentage_numeric = 0.0
+
+    # Determine qualification status based on LLM match percentage and weighted score
     if overall_weighted_score >= 7.0 and match_percentage_numeric >= 70.0:
         qualification_status = "Qualified"
     else:
-        # Find the section with highest weight that's underperforming
+        # Find underperforming areas
         weights_and_scores = [
             (experience_weight, experience_score, "Insufficient Experience"),
             (skills_weight, skills_score, "Skill Gaps"),
@@ -341,7 +354,7 @@ def calculate_weighted_score_and_status(
 
     return {
         "overall_weighted_score": overall_weighted_score,
-        "match_percentage": match_percentage,
+        "match_percentage": match_percentage,  # Direct from LLM
         "qualification_status": qualification_status,
         "experience_gap": False,
         "required_experience": jd_required_experience_years,
@@ -392,7 +405,7 @@ You are an expert resume evaluator. Analyze the resume against the job descripti
     10. Do not drop skills that are not in the JD — list them under "Extra skills".
     11. Ensure no skill gets lost due to grouping (e.g., "Terraform, GitHub and Git" must capture Terraform separately).
     12. If a grouped skill includes both JD-required and non-required skills, correctly separate them and place each in the right category.
-    
+
     **SEMANTIC CATEGORY SKILL MAPPING:**
      **Intelligent Category Recognition**: When matching skills, use domain knowledge to map resume skills to JD categories:
        - If resume mentions infrastructure/deployment tools and JD has DevOps/Infrastructure categories, automatically cross-reference
@@ -406,6 +419,17 @@ You are an expert resume evaluator. Analyze the resume against the job descripti
        - When JD specifies broad categories (DevOps, Frontend, Backend, etc.) but resume lists specific tools
        - Automatically determine if the specific resume tools fall under those broad JD categories
        - Count as matches when there's logical domain alignment
+       
+    **DIRECT JD MATCH ASSESSMENT:**
+    Simply evaluate how well this resume matches the job description overall and provide a direct match percentage.
+    Consider:
+    - Skills alignment with JD requirements
+    - Experience relevance to the role
+    - Education/qualification fit
+    - Past responsibilities matching JD needs
+    **Just provide your direct assessment as a percentage** - no counting or manual calculations needed.
+    Think: "What percentage of this JD does this resume satisfy overall?"
+
 
     **PARSED_RESUME EXTRACTION REQUIREMENTS:**
     - **Comprehensive Skills Section Parsing**: Scan the entire "Skills" or "Technical Skills" section and extract EVERY mentioned technology
@@ -425,7 +449,7 @@ You are an expert resume evaluator. Analyze the resume against the job descripti
         "Education_Score": <float>,    # 0–10
         "Projects_Score": <float>,     # 0–10
         "Overall_Weighted_Score": <float>,
-        "Match_Percentage": "<float>%",
+       "Match_Percentage": "<your_direct_assessment>%",
         "Qualification Status": "<string>",
         "Pros": [ "<string>", ... ],
         "Cons": [ "<string>", ... ],

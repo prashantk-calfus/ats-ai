@@ -483,18 +483,14 @@ async def combined_parse_evaluate(resume_data: str, job_description: dict, weigh
     print(json.dumps(parsed_response, indent=2))
     print("=== END PARSED RESPONSE ===")
 
-    #
-    # # ADD THIS OVERRIDE SNIPPET HERE:
-    # if "Parsed_Resume" in parsed_response:
-    #     professional_experience = parsed_response["Parsed_Resume"].get("Professional_Experience", [])
-    #     calculated_experience = calculate_total_experience_years(professional_experience)
-    #     parsed_response["Parsed_Resume"]["Total_Experience"] = calculated_experience
-    #     print(f"=== OVERRIDE: Added Total_Experience = {calculated_experience} to Parsed_Resume ===")
-
     # Extract experience information from LLM response and validate with our functions
     try:
         if "Evaluation" in parsed_response:
             evaluation = parsed_response["Evaluation"]
+
+            # GET LLM'S DIRECT MATCH PERCENTAGE - ADD THIS LINE
+            llm_match_percentage = evaluation.get("Match_Percentage", None)
+
             # Get LLM's calculation
             evaluation.get("Total_Experience_Years", 0.0)
             llm_jd_required_experience = evaluation.get("JD_Required_Experience_Years", 0.0)
@@ -513,8 +509,6 @@ async def combined_parse_evaluate(resume_data: str, job_description: dict, weigh
                 candidate_total_experience = 0.0
                 print("No resume data found, using 0.0 years")
 
-            # Ignore LLM calculation completely for now
-
             # Validate JD requirement extraction
             calculated_jd_requirement = get_experience_from_jd_json(job_description)
             if abs(calculated_jd_requirement - llm_jd_required_experience) > 0.5:
@@ -526,6 +520,7 @@ async def combined_parse_evaluate(resume_data: str, job_description: dict, weigh
         else:
             # Fallback to our own calculations if LLM didn't provide experience data
             print("LLM didn't provide experience data, calculating ourselves...")
+            llm_match_percentage = None  # ADD THIS LINE
             candidate_total_experience = 0.0
             jd_required_experience = extract_jd_required_experience(job_description)
             experience_score = parsed_response.get("Experience_Score", 0.0)
@@ -543,13 +538,13 @@ async def combined_parse_evaluate(resume_data: str, job_description: dict, weigh
         print(f"Available keys in parsed_response: {list(parsed_response.keys())}")
 
         # Fallback values with our own calculations
+        llm_match_percentage = None  # ADD THIS LINE
         candidate_total_experience = 0.0
         jd_required_experience = get_experience_from_jd_json(job_description)
         experience_score = 0.0
         skills_score = 0.0
         education_score = 0.0
         projects_score = 0.0
-
     # Determine if projects are valid based on parsed resume data
     try:
         if "Parsed_Resume" in parsed_response:
@@ -585,15 +580,8 @@ async def combined_parse_evaluate(resume_data: str, job_description: dict, weigh
         skills_weight=weightage_config.skills_weight,
         education_weight=weightage_config.education_weight,
         projects_weight=weightage_config.projects_weight,
+        llm_match_percentage=llm_match_percentage,
     )
-
-    # print(f"=== EXPERIENCE CALCULATION ===")
-    # print(f"Candidate Experience: {candidate_total_experience} years")
-    # print(f"JD Required Experience: {jd_required_experience} years")
-    # print(f"Experience Gap: {calculation_result.get('experience_gap', False)}")
-    # print(f"Qualification Status: {calculation_result['qualification_status']}")
-    # print("=== END EXPERIENCE CALCULATION ===")
-
     # Create a standardized response structure
     if "Evaluation" not in parsed_response:
         # If the response doesn't have the nested structure, create it
