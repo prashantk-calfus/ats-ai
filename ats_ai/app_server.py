@@ -244,6 +244,36 @@ scheduler = None
 #         logger.info("Background scheduler stopped")
 
 
+# @app.post("/generate_pdf_report", status_code=status.HTTP_200_OK)
+# async def generate_pdf_report_endpoint(report_data: Dict[str, Any]):
+#     """Generate PDF report and return file path"""
+#     try:
+#         evaluation_results = report_data.get("evaluation_results")
+#         parsed_resume = report_data.get("parsed_resume")
+#         candidate_name = report_data.get("candidate_name")
+#         jd_source = report_data.get("jd_source", "Unknown JD")
+#         weightage_config = report_data.get("weightage_config")  # ADD THIS LINE
+#
+#         # Generate PDF with weightage config
+#         pdf_filename = generate_pdf_report(evaluation_results, parsed_resume, candidate_name, jd_source, weightage_config)  # ADD THIS PARAMETER
+#
+#         return {"status": "success", "pdf_path": pdf_filename, "message": "PDF report generated successfully"}
+#
+#     except Exception as e:
+#         logger.error(f"Error generating PDF report: {str(e)}")
+#         raise HTTPException(status_code=500, detail=f"Error generating PDF report: {str(e)}")
+#
+#
+# @app.get("/download_report/{filename}")
+# async def download_report(filename: str):
+#     file_path = f"reports/{filename}"
+#     if os.path.exists(file_path):
+#         return FileResponse(file_path, media_type="application/pdf", filename=filename, headers={"Content-Disposition": f"attachment; filename={filename}"})
+#     else:
+#         raise HTTPException(status_code=404, detail="Report file not found")
+#
+
+
 @app.post("/generate_pdf_report", status_code=status.HTTP_200_OK)
 async def generate_pdf_report_endpoint(report_data: Dict[str, Any]):
     """Generate PDF report and return file path"""
@@ -252,34 +282,65 @@ async def generate_pdf_report_endpoint(report_data: Dict[str, Any]):
         parsed_resume = report_data.get("parsed_resume")
         candidate_name = report_data.get("candidate_name")
         jd_source = report_data.get("jd_source", "Unknown JD")
-        weightage_config = report_data.get("weightage_config")  # ADD THIS LINE
+        weightage_config = report_data.get("weightage_config")
+
+        # Ensure reports directory exists
+        reports_dir = "reports"
+        os.makedirs(reports_dir, exist_ok=True)
 
         # Generate PDF with weightage config
-        pdf_filename = generate_pdf_report(evaluation_results, parsed_resume, candidate_name, jd_source, weightage_config)  # ADD THIS PARAMETER
+        pdf_filename = generate_pdf_report(evaluation_results, parsed_resume, candidate_name, jd_source, weightage_config)
 
-        return {"status": "success", "pdf_path": pdf_filename, "message": "PDF report generated successfully"}
+        # Ensure the PDF file exists
+        pdf_full_path = os.path.join(reports_dir, os.path.basename(pdf_filename))
+
+        # If generate_pdf_report returns full path, copy to reports folder
+        if pdf_filename != pdf_full_path and os.path.exists(pdf_filename):
+            import shutil
+
+            shutil.copy2(pdf_filename, pdf_full_path)
+            logger.info(f"PDF copied from {pdf_filename} to {pdf_full_path}")
+
+        # Verify file exists
+        if not os.path.exists(pdf_full_path):
+            raise HTTPException(status_code=500, detail=f"PDF file not found at {pdf_full_path}")
+
+        # Return just the filename (not full path) for download endpoint
+        pdf_basename = os.path.basename(pdf_full_path)
+
+        logger.info(f"PDF generated successfully: {pdf_full_path}")
+        return {"status": "success", "pdf_path": pdf_basename, "message": "PDF report generated successfully"}  # Return just filename
 
     except Exception as e:
         logger.error(f"Error generating PDF report: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error generating PDF report: {str(e)}")
 
 
-# @app.get("/download_report/{filename}")
-# async def download_report(filename: str):
-#     file_path = f"reports/{filename}"
-#     if os.path.exists(file_path):
-#         return FileResponse(file_path, media_type="application/pdf", filename=filename)
-#     else:
-#         raise HTTPException(status_code=404, detail="Report file not found")
-
-
 @app.get("/download_report/{filename}")
 async def download_report(filename: str):
-    file_path = f"reports/{filename}"
-    if os.path.exists(file_path):
-        return FileResponse(file_path, media_type="application/pdf", filename=filename, headers={"Content-Disposition": f"attachment; filename={filename}"})
-    else:
-        raise HTTPException(status_code=404, detail="Report file not found")
+    """Download PDF report file"""
+    try:
+        # Sanitize filename to prevent directory traversal
+        safe_filename = os.path.basename(filename)
+        file_path = os.path.join("reports", safe_filename)
+
+        logger.info(f"Looking for PDF at: {file_path}")
+
+        if not os.path.exists(file_path):
+            logger.error(f"PDF file not found: {file_path}")
+            # List available files for debugging
+            reports_dir = "reports"
+            if os.path.exists(reports_dir):
+                available_files = os.listdir(reports_dir)
+                logger.error(f"Available files in reports/: {available_files}")
+            raise HTTPException(status_code=404, detail=f"Report file not found: {safe_filename}")
+
+        return FileResponse(path=file_path, media_type="application/pdf", filename=safe_filename, headers={"Content-Disposition": f"attachment; filename={safe_filename}"})
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error downloading report: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error downloading report: {str(e)}")
 
 
 # Add this helper function in app_server.py

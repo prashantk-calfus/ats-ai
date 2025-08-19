@@ -1004,6 +1004,45 @@ if st.session_state.parsed_data_combined:
         #
         #             except Exception as e:
         #                 st.error(f"❌ Error generating PDF report: {str(e)}")
+
+        #
+        # with col3:
+        #     if st.button("📥 Download PDF Report", key="generate_pdf_report_btn"):
+        #         with st.spinner("🔄 Generating PDF report..."):
+        #             try:
+        #                 # Determine JD source properly
+        #                 if st.session_state.get("current_selected_jd"):
+        #                     jd_source_name = f"Selected JD: {st.session_state.current_selected_jd}"
+        #                 elif st.session_state.get("current_jd_name"):
+        #                     jd_source_name = f"Temporary JD: {st.session_state.current_jd_name}"
+        #                 else:
+        #                     jd_source_name = "Unknown JD"
+        #
+        #                 report_data = {"evaluation_results": eval_results, "parsed_resume": parsed_resume_data, "candidate_name": candidate_name, "jd_source": jd_source_name, "weightage_config": st.session_state.weightage_config}
+        #
+        #                 # Generate PDF
+        #                 response = requests.post(f"{BACKEND_URL}/generate_pdf_report", json=report_data)
+        #
+        #                 if response.status_code == 200:
+        #                     result = response.json()
+        #                     pdf_filename = os.path.basename(result["pdf_path"])
+        #
+        #                     # Download the PDF file
+        #                     download_response = requests.get(f"{BACKEND_URL}/download_report/{pdf_filename}")
+        #
+        #                     if download_response.status_code == 200:
+        #                         st.success("✅ PDF Report generated successfully!")
+        #
+        #                         # Use Streamlit's download button
+        #                         st.download_button(label="📥 Download PDF Report", data=download_response.content, file_name=pdf_filename, mime="application/pdf")
+        #                     else:
+        #                         st.error("❌ Failed to download PDF")
+        #                 else:
+        #                     st.error(f"❌ Failed to generate PDF: {response.text}")
+        #
+        #             except Exception as e:
+        #                 st.error(f"❌ Error generating PDF report: {str(e)}")
+
         with col3:
             if st.button("📥 Download PDF Report", key="generate_pdf_report_btn"):
                 with st.spinner("🔄 Generating PDF report..."):
@@ -1018,25 +1057,50 @@ if st.session_state.parsed_data_combined:
 
                         report_data = {"evaluation_results": eval_results, "parsed_resume": parsed_resume_data, "candidate_name": candidate_name, "jd_source": jd_source_name, "weightage_config": st.session_state.weightage_config}
 
+                        # # Debug: Show what we're sending
+                        # st.write("🔄 Generating PDF...")
+
                         # Generate PDF
                         response = requests.post(f"{BACKEND_URL}/generate_pdf_report", json=report_data)
 
                         if response.status_code == 200:
                             result = response.json()
-                            pdf_filename = os.path.basename(result["pdf_path"])
+                            pdf_filename = result["pdf_path"]  # This is now just the filename
+
+                            # st.write(f"✅ PDF generated: {pdf_filename}")
 
                             # Download the PDF file
-                            download_response = requests.get(f"{BACKEND_URL}/download_report/{pdf_filename}")
+                            download_url = f"{BACKEND_URL}/download_report/{pdf_filename}"
+                            # st.write(f"📥 Downloading from: {download_url}")
+
+                            download_response = requests.get(download_url)
 
                             if download_response.status_code == 200:
                                 st.success("✅ PDF Report generated successfully!")
 
                                 # Use Streamlit's download button
-                                st.download_button(label="📥 Download PDF Report", data=download_response.content, file_name=pdf_filename, mime="application/pdf")
+                                st.download_button(label="📥 Download PDF Report", data=download_response.content, file_name=pdf_filename, mime="application/pdf", key="download_pdf_final")
                             else:
-                                st.error("❌ Failed to download PDF")
-                        else:
-                            st.error(f"❌ Failed to generate PDF: {response.text}")
+                                st.error(f"❌ Failed to download PDF: {download_response.status_code}")
+                                st.error(f"Error details: {download_response.text}")
 
+                                # Debug: Check what's available
+                                # st.write("🔍 Debug info:")
+                                # st.write(f"Expected file: {pdf_filename}")
+                                # st.write(f"Download URL: {download_url}")
+
+                        else:
+                            st.error(f"❌ Failed to generate PDF: {response.status_code}")
+                            st.error(f"Response: {response.text}")
+
+                    except requests.exceptions.ConnectionError:
+                        st.error(f"❌ Cannot connect to backend at {BACKEND_URL}")
+                        st.error("Make sure your FastAPI backend is running on http://localhost:8000")
+                    except requests.exceptions.RequestException as e:
+                        st.error(f"❌ Request error: {str(e)}")
                     except Exception as e:
                         st.error(f"❌ Error generating PDF report: {str(e)}")
+                        import traceback
+
+                        st.write("Full error:")
+                        st.code(traceback.format_exc())
