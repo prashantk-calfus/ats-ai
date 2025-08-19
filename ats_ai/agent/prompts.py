@@ -392,6 +392,20 @@ You are an expert resume evaluator. Analyze the resume against the job descripti
     10. Do not drop skills that are not in the JD — list them under "Extra skills".
     11. Ensure no skill gets lost due to grouping (e.g., "Terraform, GitHub and Git" must capture Terraform separately).
     12. If a grouped skill includes both JD-required and non-required skills, correctly separate them and place each in the right category.
+    
+    **SEMANTIC CATEGORY SKILL MAPPING:**
+     **Intelligent Category Recognition**: When matching skills, use domain knowledge to map resume skills to JD categories:
+       - If resume mentions infrastructure/deployment tools and JD has DevOps/Infrastructure categories, automatically cross-reference
+       - If resume mentions programming languages and JD has Development/Programming categories, automatically cross-reference  
+       - If resume mentions databases and JD has Database/Storage categories, automatically cross-reference
+     **Skill-to-Category Intelligence**: 
+       - Analyze the semantic meaning of resume skills to determine which JD categories they would logically fulfill
+       - A resume skill matches a JD category if that skill type typically belongs to that domain area
+       - Use technical domain knowledge to bridge the gap between specific tools mentioned in resume and broader categories in JD
+     **Reverse Category Matching**: 
+       - When JD specifies broad categories (DevOps, Frontend, Backend, etc.) but resume lists specific tools
+       - Automatically determine if the specific resume tools fall under those broad JD categories
+       - Count as matches when there's logical domain alignment
 
     **PARSED_RESUME EXTRACTION REQUIREMENTS:**
     - **Comprehensive Skills Section Parsing**: Scan the entire "Skills" or "Technical Skills" section and extract EVERY mentioned technology
@@ -416,9 +430,9 @@ You are an expert resume evaluator. Analyze the resume against the job descripti
         "Pros": [ "<string>", ... ],
         "Cons": [ "<string>", ... ],
         "Skills Match": [
-          "STRICT RULE: Only list skills present in the JD's Required_Skills or Preferred_Skills arrays AND in the consolidated resume skill set",
-          "Explain how each matched skill is demonstrated in the resume (skills section, projects, or experience)",
-          "If skill is only in resume but not JD, move it to Extra Skills"
+          "List skills where resume tools/technologies semantically match JD categories",
+          "Format: 'Resume_Skill → JD_Category (Domain Logic: explanation)'", 
+          "Include both exact matches and semantic category matches"
         ],
         "Required_Skills_Missing_from_Resume": [
           "List JD-required skills that are NOT in the consolidated resume skill set"
