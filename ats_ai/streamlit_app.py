@@ -641,30 +641,81 @@ if st.session_state.parsed_data_combined:
     with col_cons:
         st.warning("##### ⚠️ Weaknesses")
         if cons:
+            # Get experience data for filtering
+            candidate_exp = eval_results.get("Total_Experience_Years", 0)
+            required_exp = eval_results.get("JD_Required_Experience_Years", 0)
+            has_experience_gap = required_exp > 0 and candidate_exp < required_exp
+
             # Separate experience-related cons from others
             experience_cons = []
             other_cons = []
 
             for c in cons:
-                if any(keyword in c.lower() for keyword in ["experience", "years", "senior", "junior"]):
-                    experience_cons.append(c)
+                # Check if this is an experience-related weakness
+                is_exp_related = any(
+                    phrase in c.lower()
+                    for phrase in [
+                        "below the minimum",
+                        "minimum required years",
+                        "does not meet the minimum",
+                        "falls short of the",
+                        "insufficient experience",
+                        "lacks the required years",
+                        "not meet the minimum",
+                        "experience requirement",
+                        "minimum experience",
+                        "required experience",
+                        "years of experience",
+                        "experience gap",
+                        "below minimum",
+                        "short of",
+                        "less than required",
+                    ]
+                )
+
+                if is_exp_related:
+                    # Include experience weakness ONLY if there's actually a gap
+                    if has_experience_gap:
+                        experience_cons.append(c)
+                    # Skip if no actual gap exists (incorrect LLM weakness)
                 else:
                     other_cons.append(c)
 
-            # Display experience cons first and prominently
+            # If LLM didn't provide experience weakness but gap exists, add it
+            if has_experience_gap and not experience_cons:
+                gap = required_exp - candidate_exp
+                experience_cons.append(f"Does not meet minimum experience requirement ({candidate_exp} years vs {required_exp}+ required, gap of {gap:.1f} years)")
+
+            # Display experience cons first
             if experience_cons:
                 st.error("**Experience Issues:**")
                 for exp_con in experience_cons:
                     st.markdown(f"- 🚫 {exp_con}")
 
-            # Then display other cons
+            # Display other cons
             if other_cons:
-                if experience_cons:  # Only add header if we had experience cons
+                if experience_cons:
                     st.warning("**Other Areas for Improvement:**")
+                else:
+                    st.warning("**Areas for Improvement:**")
                 for other_con in other_cons:
                     st.markdown(f"- {other_con}")
+
+            # Show message only if no cons at all
+            if not experience_cons and not other_cons:
+                st.info("No specific weaknesses identified.")
         else:
-            st.info("No specific weaknesses identified.")
+            # If LLM provided no cons but experience gap exists, show it
+            candidate_exp = eval_results.get("Total_Experience_Years", 0)
+            required_exp = eval_results.get("JD_Required_Experience_Years", 0)
+            has_experience_gap = required_exp > 0 and candidate_exp < required_exp
+
+            if has_experience_gap:
+                st.error("**Experience Issues:**")
+                gap = required_exp - candidate_exp
+                st.markdown(f"- 🚫 Does not meet minimum experience requirement ({candidate_exp} years vs {required_exp}+ required, gap of {gap:.1f} years)")
+            else:
+                st.info("No specific weaknesses identified.")
 
     # Skills Analysis
     skills_match = eval_results.get("Skills Match")
@@ -1006,43 +1057,6 @@ if st.session_state.parsed_data_combined:
         #                 st.error(f"❌ Error generating PDF report: {str(e)}")
 
         #
-        # with col3:
-        #     if st.button("📥 Download PDF Report", key="generate_pdf_report_btn"):
-        #         with st.spinner("🔄 Generating PDF report..."):
-        #             try:
-        #                 # Determine JD source properly
-        #                 if st.session_state.get("current_selected_jd"):
-        #                     jd_source_name = f"Selected JD: {st.session_state.current_selected_jd}"
-        #                 elif st.session_state.get("current_jd_name"):
-        #                     jd_source_name = f"Temporary JD: {st.session_state.current_jd_name}"
-        #                 else:
-        #                     jd_source_name = "Unknown JD"
-        #
-        #                 report_data = {"evaluation_results": eval_results, "parsed_resume": parsed_resume_data, "candidate_name": candidate_name, "jd_source": jd_source_name, "weightage_config": st.session_state.weightage_config}
-        #
-        #                 # Generate PDF
-        #                 response = requests.post(f"{BACKEND_URL}/generate_pdf_report", json=report_data)
-        #
-        #                 if response.status_code == 200:
-        #                     result = response.json()
-        #                     pdf_filename = os.path.basename(result["pdf_path"])
-        #
-        #                     # Download the PDF file
-        #                     download_response = requests.get(f"{BACKEND_URL}/download_report/{pdf_filename}")
-        #
-        #                     if download_response.status_code == 200:
-        #                         st.success("✅ PDF Report generated successfully!")
-        #
-        #                         # Use Streamlit's download button
-        #                         st.download_button(label="📥 Download PDF Report", data=download_response.content, file_name=pdf_filename, mime="application/pdf")
-        #                     else:
-        #                         st.error("❌ Failed to download PDF")
-        #                 else:
-        #                     st.error(f"❌ Failed to generate PDF: {response.text}")
-        #
-        #             except Exception as e:
-        #                 st.error(f"❌ Error generating PDF report: {str(e)}")
-
         with col3:
             if st.button("📥 Download PDF Report", key="generate_pdf_report_btn"):
                 with st.spinner("🔄 Generating PDF report..."):
@@ -1057,50 +1071,87 @@ if st.session_state.parsed_data_combined:
 
                         report_data = {"evaluation_results": eval_results, "parsed_resume": parsed_resume_data, "candidate_name": candidate_name, "jd_source": jd_source_name, "weightage_config": st.session_state.weightage_config}
 
-                        # # Debug: Show what we're sending
-                        # st.write("🔄 Generating PDF...")
-
                         # Generate PDF
                         response = requests.post(f"{BACKEND_URL}/generate_pdf_report", json=report_data)
 
                         if response.status_code == 200:
                             result = response.json()
-                            pdf_filename = result["pdf_path"]  # This is now just the filename
-
-                            # st.write(f"✅ PDF generated: {pdf_filename}")
+                            pdf_filename = os.path.basename(result["pdf_path"])
 
                             # Download the PDF file
-                            download_url = f"{BACKEND_URL}/download_report/{pdf_filename}"
-                            # st.write(f"📥 Downloading from: {download_url}")
-
-                            download_response = requests.get(download_url)
+                            download_response = requests.get(f"{BACKEND_URL}/download_report/{pdf_filename}")
 
                             if download_response.status_code == 200:
                                 st.success("✅ PDF Report generated successfully!")
 
                                 # Use Streamlit's download button
-                                st.download_button(label="📥 Download PDF Report", data=download_response.content, file_name=pdf_filename, mime="application/pdf", key="download_pdf_final")
+                                st.download_button(label="📥 Download PDF Report", data=download_response.content, file_name=pdf_filename, mime="application/pdf")
                             else:
-                                st.error(f"❌ Failed to download PDF: {download_response.status_code}")
-                                st.error(f"Error details: {download_response.text}")
-
-                                # Debug: Check what's available
-                                # st.write("🔍 Debug info:")
-                                # st.write(f"Expected file: {pdf_filename}")
-                                # st.write(f"Download URL: {download_url}")
-
+                                st.error("❌ Failed to download PDF")
                         else:
-                            st.error(f"❌ Failed to generate PDF: {response.status_code}")
-                            st.error(f"Response: {response.text}")
+                            st.error(f"❌ Failed to generate PDF: {response.text}")
 
-                    except requests.exceptions.ConnectionError:
-                        st.error(f"❌ Cannot connect to backend at {BACKEND_URL}")
-                        st.error("Make sure your FastAPI backend is running on http://localhost:8000")
-                    except requests.exceptions.RequestException as e:
-                        st.error(f"❌ Request error: {str(e)}")
                     except Exception as e:
                         st.error(f"❌ Error generating PDF report: {str(e)}")
-                        import traceback
 
-                        st.write("Full error:")
-                        st.code(traceback.format_exc())
+        # with col3:
+        #     if st.button("📥 Download PDF Report", key="generate_pdf_report_btn"):
+        #         with st.spinner("🔄 Generating PDF report..."):
+        #             try:
+        #                 # Determine JD source properly
+        #                 if st.session_state.get("current_selected_jd"):
+        #                     jd_source_name = f"Selected JD: {st.session_state.current_selected_jd}"
+        #                 elif st.session_state.get("current_jd_name"):
+        #                     jd_source_name = f"Temporary JD: {st.session_state.current_jd_name}"
+        #                 else:
+        #                     jd_source_name = "Unknown JD"
+        #
+        #                 report_data = {"evaluation_results": eval_results, "parsed_resume": parsed_resume_data, "candidate_name": candidate_name, "jd_source": jd_source_name, "weightage_config": st.session_state.weightage_config}
+        #
+        #                 # # Debug: Show what we're sending
+        #                 # st.write("🔄 Generating PDF...")
+        #
+        #                 # Generate PDF
+        #                 response = requests.post(f"{BACKEND_URL}/generate_pdf_report", json=report_data)
+        #
+        #                 if response.status_code == 200:
+        #                     result = response.json()
+        #                     pdf_filename = result["pdf_path"]  # This is now just the filename
+        #
+        #                     # st.write(f"✅ PDF generated: {pdf_filename}")
+        #
+        #                     # Download the PDF file
+        #                     download_url = f"{BACKEND_URL}/download_report/{pdf_filename}"
+        #                     # st.write(f"📥 Downloading from: {download_url}")
+        #
+        #                     download_response = requests.get(download_url)
+        #
+        #                     if download_response.status_code == 200:
+        #                         st.success("✅ PDF Report generated successfully!")
+        #
+        #                         # Use Streamlit's download button
+        #                         st.download_button(label="📥 Download PDF Report", data=download_response.content, file_name=pdf_filename, mime="application/pdf", key="download_pdf_final")
+        #                     else:
+        #                         st.error(f"❌ Failed to download PDF: {download_response.status_code}")
+        #                         st.error(f"Error details: {download_response.text}")
+        #
+        #                         # Debug: Check what's available
+        #                         # st.write("🔍 Debug info:")
+        #                         # st.write(f"Expected file: {pdf_filename}")
+        #                         # st.write(f"Download URL: {download_url}")
+        #
+        #                 else:
+        #                     st.error(f"❌ Failed to generate PDF: {response.status_code}")
+        #                     st.error(f"Response: {response.text}")
+        #
+        #             except requests.exceptions.ConnectionError:
+        #                 st.error(f"❌ Cannot connect to backend at {BACKEND_URL}")
+        #                 st.error("Make sure your FastAPI backend is running on http://localhost:8000")
+        #             except requests.exceptions.RequestException as e:
+        #                 st.error(f"❌ Request error: {str(e)}")
+        #             except Exception as e:
+        #                 st.error(f"❌ Error generating PDF report: {str(e)}")
+        #                 import traceback
+        #
+        #                 st.write("Full error:")
+        #                 st.code(traceback.format_exc())

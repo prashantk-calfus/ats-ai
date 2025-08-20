@@ -429,6 +429,15 @@ You are an expert resume evaluator. Analyze the resume against the job descripti
     - Past responsibilities matching JD needs
     **Just provide your direct assessment as a percentage** - no counting or manual calculations needed.
     Think: "What percentage of this JD does this resume satisfy overall?"
+    
+    **WEAKNESS GENERATION - MANDATORY RULES:**
+    - Before writing ANY weakness mentioning "experience", "years", "minimum", check:
+      - Is Total_Experience_Years < JD_Required_Experience_Years? 
+      - If NO, do NOT write experience-related weakness
+      - If YES, then you can mention experience gap
+    - Focus weaknesses on skills gaps, missing technologies, project depth, education relevance
+    - Example good weaknesses: "Missing expertise in X technology", "Limited demonstration of Y skill", "No experience with Z framework"
+    - Example bad weakness (if experience requirement met): "Experience slightly below minimum" - NEVER write this if requirement is met
 
 
     **PARSED_RESUME EXTRACTION REQUIREMENTS:**
@@ -452,11 +461,20 @@ You are an expert resume evaluator. Analyze the resume against the job descripti
        "Match_Percentage": "<your_direct_assessment>%",
         "Qualification Status": "<string>",
         "Pros": [ "<string>", ... ],
-        "Cons": [ "<string>", ... ],
-        "Skills Match": [
-          "List skills where resume tools/technologies semantically match JD categories",
-          "Format: 'Resume_Skill → JD_Category (Domain Logic: explanation)'", 
-          "Include both exact matches and semantic category matches"
+       "Cons": [ "Generate 2-3 specific weaknesses based on your scoring analysis",
+ 
+          "If Skills_Score < 7: mention specific missing skills or lack of demonstrated expertise",
+          "If Education_Score < 7: mention education relevance issues",
+          "If Projects_Score < 7: mention project-related weaknesses",
+          "Focus on actionable areas for improvement" ],
+      "Skills Match": [
+        "List skills where resume tools/technologies semantically match JD categories",
+        "Format: 'Resume_Skill → JD_Category (Implementation: specific project usage/achievement)'",
+        "Include both exact matches and semantic category matches",
+        "Focus on HOW the skill was actually implemented in projects rather than generic domain explanations",
+        "Provide quantifiable results and business impact when available",
+        "Extract specific technical details and project context from resume"
+        ]
         ],
         "Required_Skills_Missing_from_Resume": [
           "List JD-required skills that are NOT in the consolidated resume skill set"
