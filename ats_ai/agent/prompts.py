@@ -389,7 +389,9 @@ You are an expert resume evaluator. Analyze the resume against the job descripti
 
     CRITICAL INSTRUCTIONS:
     1. **DO NOT CALCULATE EXPERIENCE YEARS**: Leave Total_Experience_Years and JD_Required_Experience_Years as 0.0 - the system will calculate separately.
-    2. Focus on the QUALITY and RELEVANCE of experience, skills, education, and projects.
+    2. EXPERIENCE SCORING RULES:
+   - If the resume has no Professional Experience section OR candidate clearly has 0 years of work experience, set Experience_Score = 0.0
+   - Otherwise, assign 0–10 based only on quality and relevance and years count.
     3. For matched skills, explain HOW they're demonstrated in the resume (either in skills section, projects, or work experience).
     4. Do NOT use placeholder/example values – extract only from resume and JD.
     5. Education must be directly relevant to the job field (e.g., CS/IT/Data for tech roles). Score based on field relevance + degree level, not just presence.
