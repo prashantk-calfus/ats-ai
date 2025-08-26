@@ -151,21 +151,93 @@ def calculate_total_experience_years(professional_experience):
         print(f"DEBUG: Duration string: '{duration}'")
 
         # Parse duration string
-        duration_years = parse_duration_to_years(duration, current_year, current_month)
+        # duration_years = parse_duration_to_years(duration, current_year, current_month)
+        duration_years = parse_duration_to_years(duration, current_year, current_month, "auto")
         print(f"DEBUG: Parsed years: {duration_years}")
 
         if duration_years > 0:
             experience_periods.append(duration_years)
 
-    # Sum all experience periods (assuming no overlap for simplicity)
-    total_years = sum(experience_periods)
+            # Calculate total experience from earliest start to latest end
+            # Smart overlap detection and calculation
+            # Month-level overlap detection
+            if experience_periods:
+                # Parse actual month ranges for overlap detection
+                # Parse actual month ranges for overlap detection
+                month_ranges = []
+                has_present = False
+
+                for exp in professional_experience:
+                    duration = exp.get("Duration", "") if isinstance(exp, dict) else str(exp)
+                    duration_lower = duration.lower()
+
+                    # Check for Present
+                    if "present" in duration_lower or "current" in duration_lower:
+                        has_present = True
+
+                    # Parse MM/DD/YYYY - MM/DD/YYYY format (your main format)
+                    range_match = re.search(r"(\d{1,2})/(\d{1,2})/(\d{4})\s*(?:[-–—]|to)\s*(\d{1,2})/(\d{1,2})/(\d{4})", duration_lower)
+                    if range_match:
+                        start_month, start_year = int(range_match.group(1)), int(range_match.group(3))
+                        end_month, end_year = int(range_match.group(4)), int(range_match.group(6))
+                        month_ranges.append(((start_year, start_month), (end_year, end_month)))
+                    # Parse MM/YYYY - MM/YYYY format
+                    elif re.search(r"(\d{1,2})/(\d{4})\s*(?:[-–—]|to)\s*(\d{1,2})/(\d{4})", duration_lower):
+                        range_match = re.search(r"(\d{1,2})/(\d{4})\s*(?:[-–—]|to)\s*(\d{1,2})/(\d{4})", duration_lower)
+                        start_month, start_year = int(range_match.group(1)), int(range_match.group(2))
+                        end_month, end_year = int(range_match.group(3)), int(range_match.group(4))
+                        month_ranges.append(((start_year, start_month), (end_year, end_month)))
+                    # Parse Present cases
+                    elif "present" in duration_lower:
+                        present_match = re.search(r"(\d{1,2})/(?:\d{1,2}/)?(\d{4})", duration_lower)
+                        if present_match:
+                            start_month = int(present_match.group(1))
+                            start_year = int(present_match.group(2))
+                            month_ranges.append(((start_year, start_month), (current_year, current_month)))
+
+                # Check for month-level overlaps
+                has_month_overlap = False
+                for i in range(len(month_ranges)):
+                    for j in range(i + 1, len(month_ranges)):
+                        start1, end1 = month_ranges[i]
+                        start2, end2 = month_ranges[j]
+
+                        # Check if periods overlap: start1 <= end2 and start2 <= end1
+                        if start1 <= end2 and start2 <= end1:
+                            has_month_overlap = True
+                            break
+                    if has_month_overlap:
+                        break
+
+                if has_month_overlap:
+                    # True overlap: use timeline from earliest to latest
+                    all_years = []
+                    for exp in professional_experience:
+                        duration = exp.get("Duration", "") if isinstance(exp, dict) else str(exp)
+                        years_found = re.findall(r"\b(20\d{2}|19\d{2})\b", duration)
+                        all_years.extend(int(y) for y in years_found)
+
+                    earliest_year = min(all_years)
+                    if has_present:
+                        total_years = current_year - earliest_year
+                    else:
+                        latest_year = max(all_years)
+                        total_years = latest_year - earliest_year + 1
+                    print(f"DEBUG: Month-level overlap detected, timeline: {total_years} years")
+                else:
+                    # No overlap: sum individual periods
+                    total_years = sum(experience_periods)
+                    print(f"DEBUG: No month overlap, summing: {total_years} years")
+            else:
+                total_years = 0.0
+
     print(f"DEBUG: Individual periods: {experience_periods}")
-    print(f"DEBUG: Total calculated years: {total_years}")
+    print(f"DEBUG: Calculated total (overlap-adjusted): {total_years}")
 
     return round(total_years, 1)
 
 
-def parse_duration_to_years(duration_str, current_year, current_month):
+def parse_duration_to_years(duration_str, current_year, current_month, date_format="MM/DD/YYYY"):
     """
     Enhanced parser for duration strings with better handling of explicit durations
     FIXED: Better Present calculation and month handling
@@ -175,6 +247,18 @@ def parse_duration_to_years(duration_str, current_year, current_month):
     duration_str = duration_str.lower()
 
     print(f"DEBUG: Parsing duration: '{original_duration}'")
+    # Auto-detect date format if needed
+    if date_format == "auto":
+        # Look for clear indicators to determine format
+        if re.search(r"\b(1[3-9]|[2-3]\d)/\d{1,2}/\d{4}\b", original_duration):  # Day > 12 in first position
+            date_format = "DD/MM/YYYY"
+            print("DEBUG: Auto-detected DD/MM/YYYY format")
+        elif re.search(r"\b\d{1,2}/(1[3-9]|[2-3]\d)/\d{4}\b", original_duration):  # Day > 12 in second position
+            date_format = "MM/DD/YYYY"
+            print("DEBUG: Auto-detected MM/DD/YYYY format")
+        else:
+            date_format = "MM/DD/YYYY"  # Default to US format
+            print("DEBUG: Using default MM/DD/YYYY format")
 
     # PRIORITY 1: Handle explicit durations in parentheses first (most reliable)
     # Pattern: "06/2025 - Present (0.4 years)" or "07/2022 - 05/2025 (2.9 years)"
@@ -191,19 +275,30 @@ def parse_duration_to_years(duration_str, current_year, current_month):
         print(f"DEBUG: Found explicit months in parentheses: {months} -> {years} years")
         return years
 
-    # PRIORITY 2: Handle "Present/Current" cases with date calculation - FIXED
     present_patterns = [
         # "06/2025 to Present/Current", "10/2018 - Present" etc.
         r"(\d{1,2})/(\d{4})\s*(?:[-–—]|to)\s*(?:present|current)",
         r"(\w+)\s+(\d{4})\s*(?:[-–—]|to)\s*(?:present|current)",
+        # Handle MM/DD/YYYY format for Present
+        r"(\d{1,2})/(\d{1,2})/(\d{4})\s*(?:[-–—]|to)\s*(?:present|current)",
     ]
 
     for pattern in present_patterns:
         match = re.search(pattern, duration_str)
         if match:
-            if "/" in pattern:
+            if len(match.groups()) == 3:  # MM/DD/YYYY - Present format
+                if date_format == "DD/MM/YYYY":
+                    start_day = int(match.group(1))
+                    start_month = int(match.group(2))
+                else:  # MM/DD/YYYY (default)
+                    start_month = int(match.group(1))
+                    start_day = int(match.group(2))
+                start_year = int(match.group(3))
+                print(f"DEBUG: Detected full date format for Present: {start_month}/{start_day}/{start_year}")
+            elif "/" in pattern:
                 start_month = int(match.group(1))
                 start_year = int(match.group(2))
+
             else:
                 start_month_str = match.group(1)
                 start_year = int(match.group(2))
@@ -250,20 +345,37 @@ def parse_duration_to_years(duration_str, current_year, current_month):
 
     # PRIORITY 3: Handle completed date ranges - IMPROVED
     completed_patterns = [
-        # "07/2022 - 05/2025", "08/2016 - 10/2018", "07/2022 to 05/2025"
+        # "11/01/2011 - 09/30/2022" (MM/DD/YYYY - MM/DD/YYYY format)
+        r"(\d{1,2})/(\d{1,2})/(\d{4})\s*(?:[-–—]|to)\s*(\d{1,2})/(\d{1,2})/(\d{4})",
+        # "07/2022 - 05/2025", "08/2016 - 10/2018", "07/2022 to 05/2025" (MM/YYYY - MM/YYYY format)
         r"(\d{1,2})/(\d{4})\s*(?:[-–—]|to)\s*(\d{1,2})/(\d{4})",
+        # "June 2012 - March 2021" (Month YYYY - Month YYYY format)
         r"(\w+)\s+(\d{4})\s*(?:[-–—]|to)\s*(\w+)\s+(\d{4})",
     ]
 
     for pattern in completed_patterns:
         match = re.search(pattern, duration_str)
         if match:
-            if "/" in pattern:
+            if "/" in pattern and len(match.groups()) == 6:  # MM/DD/YYYY format
+                if date_format == "DD/MM/YYYY":
+                    # start_day = int(match.group(1))
+                    start_month = int(match.group(2))
+                    # end_day = int(match.group(4))
+                    end_month = int(match.group(5))
+                else:  # MM/DD/YYYY (default)
+                    start_month = int(match.group(1))
+                    # start_day = int(match.group(2))
+                    end_month = int(match.group(4))
+                    # end_day = int(match.group(5))
+                start_year = int(match.group(3))
+                end_year = int(match.group(6))
+            elif "/" in pattern and len(match.groups()) == 4:  # MM/YYYY format
+                # existing MM/YYYY logic stays the same # MM/YYYY format
                 start_month = int(match.group(1))
                 start_year = int(match.group(2))
                 end_month = int(match.group(3))
                 end_year = int(match.group(4))
-            else:
+            else:  # Month YYYY format
                 start_month_str = match.group(1)
                 start_year = int(match.group(2))
                 end_month_str = match.group(3)
@@ -297,7 +409,7 @@ def parse_duration_to_years(duration_str, current_year, current_month):
                 start_month = month_map.get(start_month_str.lower()[:3], 1)
                 end_month = month_map.get(end_month_str.lower()[:3], 1)
 
-            # IMPROVED: Calculate total months including both start and end months
+            # Calculate total months including both start and end months
             total_months = (end_year - start_year) * 12 + (end_month - start_month) + 1
             years = max(total_months / 12.0, 0)
 
@@ -307,10 +419,12 @@ def parse_duration_to_years(duration_str, current_year, current_month):
 
     # PRIORITY 4: Simple year ranges like "2023 - 2024"
     year_range = re.search(r"(\d{4})\s*(?:[-–—]|to)\s*(\d{4})", duration_str)
+    # PRIORITY 4: Simple year ranges like "2023 - 2024"
+    year_range = re.search(r"(\d{4})\s*(?:[-–—]|to)\s*(\d{4})", duration_str)
     if year_range:
         start_year = int(year_range.group(1))
         end_year = int(year_range.group(2))
-        years = max(end_year - start_year + 1, 0)  # +1 for inclusive years
+        years = max(end_year - start_year, 0)  # Remove +1 for more realistic calculation
         print(f"DEBUG: Year range: {start_year}-{end_year} -> {years} years")
         return years
 
@@ -356,7 +470,48 @@ def parse_duration_to_years(duration_str, current_year, current_month):
 # Test function to verify the fix
 def test_experience_calculation():
     """Test function to verify the experience calculation"""
-    test_experiences = [{"Duration": "July 2022 – May 2025", "Company": "Company A", "Role": "Developer"}, {"Duration": "June 2025 – Present", "Company": "Company d", "Role": "Senior Developer"}]
+    test_experiences = [
+        {
+            "Duration": "2025 - Present",
+            "Company": "Redbus",
+            "Role": "Senior Software Engineer",
+            "Experience": "Ongoing (~8 months as of Aug 2025)",
+            "Highlights": [
+                "Developed and integrated high-performing rail food aggregators – Zomato and Rel Food.",
+                "Collaborated with cross-functional teams for business and product integration.",
+                "Onboarded new business partners for redRails and co-partners.",
+            ],
+        },
+        {
+            "Duration": "2022 - 2024",
+            "Company": "Redbus",
+            "Role": "Software Engineer",
+            "Experience": "2 years",
+            "Highlights": [
+                "Developed and coordinated rail products such as 'Seat/Travel Guarantee', 'Train Chart Time Service', and 'Availability After Chart Time'.",
+                "Enhanced ticketing features acting as a unique selling proposition for rail services.",
+                "Contributed to increased sales for redBus, redRails, MakeMyTrip, and Goibibo.",
+            ],
+        },
+        {
+            "Duration": "2021 - 2022",
+            "Company": "Redbus",
+            "Role": "Associate Software Engineer",
+            "Experience": "1 year",
+            "Highlights": [
+                "Built web applications for bulk bus ticket cancellations across multiple RTC workflows.",
+                "Implemented customized logic per RTC’s cancellation policies and use cases.",
+                "Prevented financial losses by automating and streamlining cancellation processes.",
+            ],
+        },
+        {
+            "Duration": "2019 - 2020",
+            "Company": "Redbus",
+            "Role": "Application Support Engineer",
+            "Experience": "1 year",
+            "Highlights": ["Developed automation scripts and user-friendly UI for daily reports and alerts.", "Reduced manual support effort by 90% through automated monitoring.", "Improved operational efficiency with proactive alerting systems."],
+        },
+    ]
 
     total_years = calculate_total_experience_years(test_experiences)
     print(f"\nFINAL RESULT: Total Experience = {total_years} years")

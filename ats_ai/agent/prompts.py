@@ -421,6 +421,12 @@ You are an expert resume evaluator. Analyze the resume against the job descripti
        - When JD specifies broad categories (DevOps, Frontend, Backend, etc.) but resume lists specific tools
        - Automatically determine if the specific resume tools fall under those broad JD categories
        - Count as matches when there's logical domain alignment
+       **Domain Knowledge Application:**
+        - Use your technical knowledge of common tools, platforms, and frameworks to resolve naming inconsistencies.
+        - Treat resume skills and JD tools as equivalent if they clearly refer to the same or related technology (e.g., “Kafka” implies “Apache Kafka”, “Go” means “Golang”).
+        - If the resume refers to a tool, platform, or concept with partial or alternate terminology, infer the full name or correct category using your understanding of the tech ecosystem.
+        - Apply contextual reasoning to identify tools even if misspelled, abbreviated, or embedded in grouped lists.
+
        
     **DIRECT JD MATCH ASSESSMENT:**
     Simply evaluate how well this resume matches the job description overall and provide a direct match percentage.
@@ -462,9 +468,11 @@ You are an expert resume evaluator. Analyze the resume against the job descripti
         "Overall_Weighted_Score": <float>,
        "Match_Percentage": "<your_direct_assessment>%",
         "Qualification Status": "<string>",
-        "Pros": [ "<string>", ... ],
+        "Pros": [ 
+        " Only list strengths that are relevant to the JD requirements or domain."
+        " Do NOT mention technical/backend/cloud/DevOps skills as strengths if the JD is for non-technical roles (e.g., Communication, Marketing, HR)."
+        " If no JD-relevant strengths are found, you may write: "No major strengths aligned with the JD requirements."],
        "Cons": [ "Generate 2-3 specific weaknesses based on your scoring analysis",
- 
           "If Skills_Score < 7: mention specific missing skills or lack of demonstrated expertise",
           "If Education_Score < 7: mention education relevance issues",
           "If Projects_Score < 7: mention project-related weaknesses",
@@ -473,9 +481,11 @@ You are an expert resume evaluator. Analyze the resume against the job descripti
         "List skills where resume tools/technologies semantically match JD categories",
         "Format: 'Resume_Skill → JD_Category (Implementation: specific project usage/achievement)'",
         "Include both exact matches and semantic category matches",
+        "CRITICAL: Only match skills that belong to the same professional domain as the JD",
+          "For non-technical JDs (Communication, HR, Marketing): ignore programming languages, cloud platforms, DevOps tools",
+          "For technical JDs: match technical skills normally",
         "Focus on HOW the skill was actually implemented in projects rather than generic domain explanations",
         "Provide quantifiable results and business impact when available",
-        "Extract specific technical details and project context from resume"
         ]
         ],
         "Required_Skills_Missing_from_Resume": [
