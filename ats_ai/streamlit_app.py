@@ -487,38 +487,6 @@ if st.session_state.parsed_data_combined:
                 st.caption("✓ Experience requirement met")
         else:
             st.error(f"❌ Status: {status}")
-    #
-    # if eval_results.get("Total_Experience_Years") is not None and eval_results.get("JD_Required_Experience_Years") is not None:
-    #     st.markdown("---")
-    #     st.subheader(" Experience Analysis")
-    #
-    #     candidate_exp = eval_results["Total_Experience_Years"]
-    #     required_exp = eval_results["JD_Required_Experience_Years"]
-    #
-    #     col_exp1, col_exp2, col_exp3 = st.columns(3)
-    #
-    #     with col_exp1:
-    #         st.metric(label="Candidate Experience", value=f"{candidate_exp} years")
-    #
-    #     with col_exp2:
-    #         st.metric(label="Required Experience", value=f"{required_exp}+ years" if required_exp > 0 else "No minimum specified")
-    #
-    #     with col_exp3:
-    #         if required_exp > 0:
-    #             if candidate_exp >= required_exp:
-    #                 gap = candidate_exp - required_exp
-    #                 st.success(f"✅ Meets requirement (+{gap:.1f} years)")
-    #             else:
-    #                 gap = required_exp - candidate_exp
-    #                 st.error(f"❌ Experience Gap (-{gap:.1f} years)")
-    #         else:
-    #             st.info("ℹ️ No minimum experience required")
-    #
-    #     # Experience Gap Warning
-    #     if required_exp > 0 and candidate_exp < required_exp:
-    #         gap = required_exp - candidate_exp
-    #         st.warning(f" **Experience Disqualification**: Candidate has {gap:.1f} years less than the minimum required experience.")
-    # # rough
 
     st.markdown("---")
     st.subheader("📈 Detailed Scores")
@@ -831,44 +799,6 @@ if st.session_state.parsed_data_combined:
             else:
                 st.info("No professional experience details provided.")
 
-            # st.markdown("---")
-            # st.markdown("#### 🚀 Projects")
-            # project_entries = parsed_resume_data.get("Projects", [])
-            #
-            # # Check if projects are meaningful or just NA placeholders
-            # has_valid_projects = False
-            # if project_entries:
-            #     for proj in project_entries:
-            #         if isinstance(proj, dict):
-            #             project_name = proj.get("Project_Name", proj.get("Title", "")).strip()
-            #             if project_name and project_name.upper() not in ["NA", "N/A", ""]:
-            #                 has_valid_projects = True
-            #                 break
-            #         elif isinstance(proj, str):
-            #             if proj.strip() and proj.strip().upper() not in ["NA", "N/A", ""]:
-            #                 has_valid_projects = True
-            #                 break
-            #
-            # if has_valid_projects:
-            #     for proj in project_entries:
-            #         if isinstance(proj, dict):
-            #             project_name = proj.get("Project_Name", proj.get("Title", "N/A"))
-            #             if project_name.upper() not in ["NA", "N/A"]:
-            #                 st.markdown(f"**Project Name:** {project_name}")
-            #                 description = proj.get("Project_Description", proj.get("Description", "N/A"))
-            #                 technologies = proj.get("Technologies", [])
-            #                 if description and description.strip().lower() not in ["na", "n/a"]:
-            #                     st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;*Description:* {description}")
-            #                 if technologies and isinstance(technologies, list) and len(technologies) > 0:
-            #                     tech_str = ", ".join(technologies)
-            #                     st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;*Technologies:* {tech_str}")
-            #         elif isinstance(proj, str):
-            #             if proj.strip().upper() not in ["NA", "N/A"]:
-            #                 st.markdown(f"**Project:** {proj}")
-            # else:
-            #     st.info("No project details provided. (Projects section excluded from scoring)")
-            # Replace the project validation section in streamlit_app.py (around line 385-420)
-
             st.markdown("---")
             st.markdown("#### 🚀 Projects")
             project_entries = parsed_resume_data.get("Projects", [])
@@ -1015,50 +945,6 @@ if st.session_state.parsed_data_combined:
                 else:
                     st.error(f"Failed to store decision: {response.text}")
 
-        # with col3:
-        #     if st.button("📥 Download PDF Report", key="generate_pdf_report_btn"):
-        #         with st.spinner("🔄 Generating PDF report..."):
-        #             try:
-        #                 # Determine JD source properly
-        #                 if st.session_state.get("current_selected_jd"):
-        #                     jd_source_name = f"Selected JD: {st.session_state.current_selected_jd}"
-        #                 elif st.session_state.get("current_jd_name"):
-        #                     jd_source_name = f"Temporary JD: {st.session_state.current_jd_name}"
-        #                 else:
-        #                     jd_source_name = "Unknown JD"
-        #
-        #                 # ADD WEIGHTAGE CONFIG TO REPORT DATA
-        #                 report_data = {"evaluation_results": eval_results, "parsed_resume": parsed_resume_data, "candidate_name": candidate_name, "jd_source": jd_source_name, "weightage_config": st.session_state.weightage_config}  # ADD THIS LINE
-        #
-        #                 # Call backend to generate PDF
-        #                 response = requests.post(f"{BACKEND_URL}/generate_pdf_report", json=report_data)
-        #
-        #                 if response.status_code == 200:
-        #                     result = response.json()
-        #                     pdf_filename = os.path.basename(result["pdf_path"])
-        #                     download_url = f"http://localhost:8000/download_report/{pdf_filename}"
-        #                     st.success("✅ PDF Report generated successfully!")
-        #
-        #                     # Inject JS to auto-download the PDF
-        #                     download_html = f"""
-        #                         <html>
-        #                             <body>
-        #                                 <a id="download_pdf_link" href="{download_url}" download style="display:none;"></a>
-        #                                 <script>
-        #                                     document.getElementById('download_pdf_link').click();
-        #                                 </script>
-        #                             </body>
-        #                         </html>
-        #                     """
-        #                     st.components.v1.html(download_html, height=0)
-        #
-        #                 else:
-        #                     st.error(f"❌ Failed to generate PDF: {response.text}")
-        #
-        #             except Exception as e:
-        #                 st.error(f"❌ Error generating PDF report: {str(e)}")
-
-        #
         with col3:
             if st.button("📥 Download PDF Report", key="generate_pdf_report_btn"):
                 with st.spinner("🔄 Generating PDF report..."):
@@ -1095,65 +981,3 @@ if st.session_state.parsed_data_combined:
 
                     except Exception as e:
                         st.error(f"❌ Error generating PDF report: {str(e)}")
-
-        # with col3:
-        #     if st.button("📥 Download PDF Report", key="generate_pdf_report_btn"):
-        #         with st.spinner("🔄 Generating PDF report..."):
-        #             try:
-        #                 # Determine JD source properly
-        #                 if st.session_state.get("current_selected_jd"):
-        #                     jd_source_name = f"Selected JD: {st.session_state.current_selected_jd}"
-        #                 elif st.session_state.get("current_jd_name"):
-        #                     jd_source_name = f"Temporary JD: {st.session_state.current_jd_name}"
-        #                 else:
-        #                     jd_source_name = "Unknown JD"
-        #
-        #                 report_data = {"evaluation_results": eval_results, "parsed_resume": parsed_resume_data, "candidate_name": candidate_name, "jd_source": jd_source_name, "weightage_config": st.session_state.weightage_config}
-        #
-        #                 # # Debug: Show what we're sending
-        #                 # st.write("🔄 Generating PDF...")
-        #
-        #                 # Generate PDF
-        #                 response = requests.post(f"{BACKEND_URL}/generate_pdf_report", json=report_data)
-        #
-        #                 if response.status_code == 200:
-        #                     result = response.json()
-        #                     pdf_filename = result["pdf_path"]  # This is now just the filename
-        #
-        #                     # st.write(f"✅ PDF generated: {pdf_filename}")
-        #
-        #                     # Download the PDF file
-        #                     download_url = f"{BACKEND_URL}/download_report/{pdf_filename}"
-        #                     # st.write(f"📥 Downloading from: {download_url}")
-        #
-        #                     download_response = requests.get(download_url)
-        #
-        #                     if download_response.status_code == 200:
-        #                         st.success("✅ PDF Report generated successfully!")
-        #
-        #                         # Use Streamlit's download button
-        #                         st.download_button(label="📥 Download PDF Report", data=download_response.content, file_name=pdf_filename, mime="application/pdf", key="download_pdf_final")
-        #                     else:
-        #                         st.error(f"❌ Failed to download PDF: {download_response.status_code}")
-        #                         st.error(f"Error details: {download_response.text}")
-        #
-        #                         # Debug: Check what's available
-        #                         # st.write("🔍 Debug info:")
-        #                         # st.write(f"Expected file: {pdf_filename}")
-        #                         # st.write(f"Download URL: {download_url}")
-        #
-        #                 else:
-        #                     st.error(f"❌ Failed to generate PDF: {response.status_code}")
-        #                     st.error(f"Response: {response.text}")
-        #
-        #             except requests.exceptions.ConnectionError:
-        #                 st.error(f"❌ Cannot connect to backend at {BACKEND_URL}")
-        #                 st.error("Make sure your FastAPI backend is running on http://localhost:8000")
-        #             except requests.exceptions.RequestException as e:
-        #                 st.error(f"❌ Request error: {str(e)}")
-        #             except Exception as e:
-        #                 st.error(f"❌ Error generating PDF report: {str(e)}")
-        #                 import traceback
-        #
-        #                 st.write("Full error:")
-        #                 st.code(traceback.format_exc())

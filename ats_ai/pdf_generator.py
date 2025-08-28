@@ -49,29 +49,6 @@ def generate_pdf_report(evaluation_results, parsed_resume, candidate_name, jd_so
     match_percentage = evaluation_results.get("Match_Percentage", "N/A")
     qualification_status = evaluation_results.get("Qualification Status", "N/A")
 
-    # # Simple metrics table with adjusted column widths
-    # metrics_data = [["Overall Score (0-10)", "Match with JD", "Status"],
-    #                 [str(overall_score), f"{match_percentage}%", str(qualification_status)]]
-    #
-    # # Adjusted column widths - make Status column wider
-    # metrics_table = Table(metrics_data, colWidths=[1.8 * inch, 1.7 * inch, 2.5 * inch])
-    # metrics_table.setStyle(
-    #     TableStyle(
-    #         [
-    #             ("BACKGROUND", (0, 0), (-1, 0), colors.lightblue),
-    #             ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-    #             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-    #             ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-    #             ("FONTSIZE", (0, 0), (-1, -1), 11),
-    #             ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
-    #             ("TOPPADDING", (0, 0), (-1, -1), 10),
-    #             ("GRID", (0, 0), (-1, -1), 1, colors.black),
-    #         ]
-    #     )
-    # )
-    #
-    # story.append(metrics_table)
-    # story.append(Spacer(1, 20))
     table_text_style = ParagraphStyle(
         "TableText",
         parent=styles["Normal"],
