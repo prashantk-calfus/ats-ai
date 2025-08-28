@@ -487,38 +487,38 @@ if st.session_state.parsed_data_combined:
                 st.caption("✓ Experience requirement met")
         else:
             st.error(f"❌ Status: {status}")
-
-    if eval_results.get("Total_Experience_Years") is not None and eval_results.get("JD_Required_Experience_Years") is not None:
-        st.markdown("---")
-        st.subheader(" Experience Analysis")
-
-        candidate_exp = eval_results["Total_Experience_Years"]
-        required_exp = eval_results["JD_Required_Experience_Years"]
-
-        col_exp1, col_exp2, col_exp3 = st.columns(3)
-
-        with col_exp1:
-            st.metric(label="Candidate Experience", value=f"{candidate_exp} years")
-
-        with col_exp2:
-            st.metric(label="Required Experience", value=f"{required_exp}+ years" if required_exp > 0 else "No minimum specified")
-
-        with col_exp3:
-            if required_exp > 0:
-                if candidate_exp >= required_exp:
-                    gap = candidate_exp - required_exp
-                    st.success(f"✅ Meets requirement (+{gap:.1f} years)")
-                else:
-                    gap = required_exp - candidate_exp
-                    st.error(f"❌ Experience Gap (-{gap:.1f} years)")
-            else:
-                st.info("ℹ️ No minimum experience required")
-
-        # Experience Gap Warning
-        if required_exp > 0 and candidate_exp < required_exp:
-            gap = required_exp - candidate_exp
-            st.warning(f" **Experience Disqualification**: Candidate has {gap:.1f} years less than the minimum required experience.")
-    # rough
+    #
+    # if eval_results.get("Total_Experience_Years") is not None and eval_results.get("JD_Required_Experience_Years") is not None:
+    #     st.markdown("---")
+    #     st.subheader(" Experience Analysis")
+    #
+    #     candidate_exp = eval_results["Total_Experience_Years"]
+    #     required_exp = eval_results["JD_Required_Experience_Years"]
+    #
+    #     col_exp1, col_exp2, col_exp3 = st.columns(3)
+    #
+    #     with col_exp1:
+    #         st.metric(label="Candidate Experience", value=f"{candidate_exp} years")
+    #
+    #     with col_exp2:
+    #         st.metric(label="Required Experience", value=f"{required_exp}+ years" if required_exp > 0 else "No minimum specified")
+    #
+    #     with col_exp3:
+    #         if required_exp > 0:
+    #             if candidate_exp >= required_exp:
+    #                 gap = candidate_exp - required_exp
+    #                 st.success(f"✅ Meets requirement (+{gap:.1f} years)")
+    #             else:
+    #                 gap = required_exp - candidate_exp
+    #                 st.error(f"❌ Experience Gap (-{gap:.1f} years)")
+    #         else:
+    #             st.info("ℹ️ No minimum experience required")
+    #
+    #     # Experience Gap Warning
+    #     if required_exp > 0 and candidate_exp < required_exp:
+    #         gap = required_exp - candidate_exp
+    #         st.warning(f" **Experience Disqualification**: Candidate has {gap:.1f} years less than the minimum required experience.")
+    # # rough
 
     st.markdown("---")
     st.subheader("📈 Detailed Scores")
@@ -670,6 +670,8 @@ if st.session_state.parsed_data_combined:
                         "below minimum",
                         "short of",
                         "less than required",
+                        "candidate has",
+                        "requires",
                     ]
                 )
 
@@ -712,8 +714,8 @@ if st.session_state.parsed_data_combined:
 
             if has_experience_gap:
                 st.error("**Experience Issues:**")
-                gap = required_exp - candidate_exp
-                st.markdown(f"- 🚫 Does not meet minimum experience requirement ({candidate_exp} years vs {required_exp}+ required, gap of {gap:.1f} years)")
+
+                st.markdown(f"- 🚫 Does not meet minimum experience requirement {required_exp}+ required years)")
             else:
                 st.info("No specific weaknesses identified.")
 

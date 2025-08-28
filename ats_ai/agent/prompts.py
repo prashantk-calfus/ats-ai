@@ -1,3 +1,5 @@
+from datetime import datetime
+
 JD_EXTRACTION_PROMPT = """
 You are an expert HR analyst AI.
 
@@ -101,6 +103,9 @@ EVALUATION_PROMPT = """
     * Formula: Match_Percentage = (Matched_Requirements / Total_JD_Requirements) * 100
 
     * Consider Required_Skills, Minimum_Experience, Qualifications, and key Responsibilities from JD
+    * Extract tools, frameworks, or methods implied in JD Responsibilities and Qualifications (e.g., Agile, Scrum, team management, budget tracking)
+    * Include them as categories to match against the candidate's resume skills or experience
+
     * Format as string with one decimal place and "%" sign (e.g., "67.5%")
     * Qualification_Status:
     * "Qualified" IF Overall_Weighted_Score >= 7.0 AND Match_Percentage (as a numerical value, e.g., 70.0) >= 70.0.
@@ -371,6 +376,11 @@ def get_dynamic_evaluation_prompt(resume_data, job_description, weightage_config
     edu_pct = weightage_config.education_weight * 100
     projects_pct = weightage_config.projects_weight * 100
 
+    current_date = datetime.now()
+    current_month_year = current_date.strftime("%B %Y")  # e.g., "December 2025"
+    current_year = current_date.year
+    current_month = current_date.month
+
     return f"""
 You are an expert resume evaluator. Analyze the resume against the job description with detailed explanations.
 
@@ -388,7 +398,18 @@ You are an expert resume evaluator. Analyze the resume against the job descripti
     6. Use this locked skill set to perform all skill matching against the JD requirements.
 
     CRITICAL INSTRUCTIONS:
-    1. **DO NOT CALCULATE EXPERIENCE YEARS**: Leave Total_Experience_Years and JD_Required_Experience_Years as 0.0 - the system will calculate separately.
+    1.**EXPERIENCE EXTRACTION REQUIREMENTS:**
+        1. **MUST EXTRACT**: For each Professional Experience entry, create an object with:
+           - "role": exact job title from resume
+           - "duration_years": calculated duration converted to years (months/12)
+        2. **MUST CALCULATE**: Extract JD_Required_Experience_Years from job description
+        3.**EXPERIENCE EXTRACTION REQUIREMENTS:
+             **MUST CALCULATE Total_Experience_Years**: Sum all individual experience durations from Professional_Experience section
+        **CRITICAL CALCULATION:**
+    - Total_Experience_Years = sum of all duration_years from Professional_Experience entries
+    - Example: If you have 0.5 years + 0.2 years experience, Total_Experience_Years = 0.7
+        4. **Include ALL experience**: Full-time, part-time, internships, freelance - extract each separately
+
     2. EXPERIENCE SCORING RULES:
    - If the resume has no Professional Experience section OR candidate clearly has 0 years of work experience, set Experience_Score = 0.0
    - Otherwise, assign 0–10 based only on quality and relevance and years count.
@@ -438,16 +459,10 @@ You are an expert resume evaluator. Analyze the resume against the job descripti
     **Just provide your direct assessment as a percentage** - no counting or manual calculations needed.
     Think: "What percentage of this JD does this resume satisfy overall?"
     
-    **WEAKNESS GENERATION - MANDATORY RULES:**
-    - Before writing ANY weakness mentioning "experience", "years", "minimum", check:
-      - Is Total_Experience_Years < JD_Required_Experience_Years? 
-      - If NO, do NOT write experience-related weakness
-      - If YES, then you can mention experience gap
-    - Focus weaknesses on skills gaps, missing technologies, project depth, education relevance
-    - Example good weaknesses: "Missing expertise in X technology", "Limited demonstration of Y skill", "No experience with Z framework"
-    - Example bad weakness (if experience requirement met): "Experience slightly below minimum" - NEVER write this if requirement is met
-
-
+**WEAKNESS GENERATION - MANDATORY RULES:**
+    - **EXPERIENCE GAP WEAKNESS REQUIRED**: If Total_Experience_Years < JD_Required_Experience_Years, you MUST include this weakness:
+      "Experience Gap: Candidate having less experience requires [USE JD_REQUIRED_EXPERIENCE_YEARS VALUE]+ years"
+    - **CRITICAL**: Use the exact calculated values, not individual job durations
     **PARSED_RESUME EXTRACTION REQUIREMENTS:**
     - **Comprehensive Skills Section Parsing**: Scan the entire "Skills" or "Technical Skills" section and extract EVERY mentioned technology
     - **Handle Mixed Skill Lists**: Parse entries like "Terraform, GitHub and Git" as separate items: ["Terraform", "GitHub", "Git"]
@@ -455,12 +470,41 @@ You are an expert resume evaluator. Analyze the resume against the job descripti
     - **Complete Technology Capture**: Include ALL tools mentioned in Skills section (Terraform, Jenkins, Jira, Confluence, etc.) in appropriate Parsed_Resume arrays
     - **Cross-Section Validation**: Ensure Technologies array in Parsed_Resume includes ALL infrastructure/DevOps tools from Skills section, not just from experience descriptions
     - **Knowledge Areas**: Include conceptual skills (NLP, Computer Vision, etc.) in Technologies array as they represent technical knowledge
+    **DURATION CALCULATION RULES:**
+    - Calculate exact duration in decimal years using this formula:
+    - Years = (End Year - Start Year) + (End Month - Start Month) / 12
+    - For ongoing roles ("Present", "Current", etc.), use {current_month_year} as end date
+    - Current date for calculations: {current_month_year}
+    - Calculate exact duration in decimal years using this formula:
+    - Years = (End Year - Start Year) + (End Month - Start Month) / 12
+    - Example: Jan 2020 to Present = ({current_year}-2020) + ({current_month}-1)/12 = {current_year-2020} + {(current_month-1)/12:.2f} = {(current_year-2020) + (current_month-1)/12:.2f} years
+    - Example: Nov 2021 to Aug 2025 = (2025-2021) + (8-11)/12 = 4 + (-3/12) = 3.75 years
+    - Example: Jan 2019 to Nov 2021 = (2021-2019) + (11-1)/12 = 2 + (10/12) = 2.83 years
+    - Example: 2023-05 to Current = ({current_year} - 2023) + ({current_month} - 5) / 12 = {current_year - 2023} + {(current_month - 5) / 12:.2f} = {(current_year - 2023) + (current_month - 5) / 12:.2f} years
+    - Example: 2018-07 to 2021-03 = (2021 - 2018) + (3 - 7) / 12 = 3 + (-4 / 12) = 3 - 0.33 = 2.67 years
 
+    - Example : 01/2022 to 12/2024 = (2024-2022) + (12-1)/12 = 2 + 0.92 = 2.92 years
+    - Example : March 2021 - November 2023 = (2023-2021) + (11-3)/12 = 2 + 0.67 = 2.67 years
+    - Example : 06/2019 - Present = ({current_year}-2019) + ({current_month}-6)/12 = {current_year-2019} + {(current_month-6)/12:.2f} = {(current_year-2019) + (current_month-6)/12:.2f} years
+    - Example : Sep 2020 - Aug 2022 = (2022-2020) + (8-9)/12 = 2 + (-1/12) = 1.92 years
+    - Example : 2018 - 2020 (year only) = assume January to December = (2020-2018) + (12-1)/12 = 2.92 years
+    - Example 8: Sept.2014 - Dec.2015 = (2015-2014) + (12-9)/12 = 1 + 0.25 = 1.25 years
+    - Example 9: "26/12/2014 - 26/12/2016" = (2016-2014) + (12-12)/12 = 2 + 0 = 2.0 years
+
+
+    - Round to 1 decimal place
+    - If current date is needed, use {current_month_year} as reference
+    
+    **EXPERIENCE VALIDATION:**
+    Before finalizing, double-check each duration calculation:
+    - Count full years first, then add fractional months
+    - Verify Total_Experience_Years equals sum of all individual durations
+    
     RETURN ONLY THIS EXACT JSON STRUCTURE:
     {{
       "Evaluation": {{
-        "Total_Experience_Years": 0.0,
-        "JD_Required_Experience_Years": 0.0,
+        "Total_Experience_Years": <calculated_float_from_resume>,
+        "JD_Required_Experience_Years": <calculated_float_from_jd>,
         "Experience_Score": <float>,   # 0–10 (quality/relevance only)
         "Skills_Score": <float>,       # 0–10
         "Education_Score": <float>,    # 0–10
@@ -472,27 +516,33 @@ You are an expert resume evaluator. Analyze the resume against the job descripti
         " Only list strengths that are relevant to the JD requirements or domain."
         " Do NOT mention technical/backend/cloud/DevOps skills as strengths if the JD is for non-technical roles (e.g., Communication, Marketing, HR)."
         " If no JD-relevant strengths are found, you may write: "No major strengths aligned with the JD requirements."],
-       "Cons": [ "Generate 2-3 specific weaknesses based on your scoring analysis",
+        "Cons": [ 
+          "MANDATORY: If Total_Experience_Years < JD_Required_Experience_Years, first weakness MUST be in format: Candidate having less experience requires [USE JD_REQUIRED_EXPERIENCE_YEARS VALUE]+ years",
+          "Generate 1-2 additional specific weaknesses based on your scoring analysis",
           "If Skills_Score < 7: mention specific missing skills or lack of demonstrated expertise",
-          "If Education_Score < 7: mention education relevance issues",
+          "If Education_Score < 7: mention education relevance issues", 
           "If Projects_Score < 7: mention project-related weaknesses",
-          "Focus on actionable areas for improvement" ],
-      "Skills Match": [
-        "List skills where resume tools/technologies semantically match JD categories",
-        "Format: 'Resume_Skill → JD_Category (Implementation: specific project usage/achievement)'",
-        "Include both exact matches and semantic category matches",
-        "CRITICAL: Only match skills that belong to the same professional domain as the JD",
-          "For non-technical JDs (Communication, HR, Marketing): ignore programming languages, cloud platforms, DevOps tools",
-          "For technical JDs: match technical skills normally",
-        "Focus on HOW the skill was actually implemented in projects rather than generic domain explanations",
-        "Provide quantifiable results and business impact when available",
-        ]
+          "Focus on actionable areas for improvement"
+          But dont write this ex.If Skills_Score < 7 in the weakness juts mention its content
         ],
+   "Skills Match": [
+  "Identify and map resume skills/tools to JD categories based on INDUSTRY STANDARD knowledge, not just exact keyword matches.",
+  "Format: 'Resume_Skill → JD_Category (Implementation: specific project usage/achievement)'",
+  "Use semantic understanding: For example, Infrastructure-as-Code tools (Terraform, ARM templates, CloudFormation, Azure DevOps templates) should align with 'Cloud Architecture / Resource Management',
+   CI/CD tools (Jenkins, GitLab CI, GitHub Actions) align with 'DevOps/Automation', Agile tools (Jira, Scrum) align with 'Project Management Skills'.",
+  "If a skill is commonly recognized in the industry as supporting JD responsibilities, include it even if not explicitly listed in the JD (e.g., Terraform → Cloud provisioning → 'Experience in cloud architecture and technology').",
+  "ADD STRENGTH ASSESSMENT: Add strength level after format → strong alignment / exceeds requirement / partial match / some alignment.",
+  "CRITICAL: Only match skills relevant to the JD’s professional domain. Ignore unrelated skills.",
+  "Focus on HOW the skill was implemented in projects (automation, optimization, migration, governance, stakeholder impact).",
+  "Highlight quantifiable results and business impact when mentioned.",
+  "CONSIDER JD RESPONSIBILITIES: Match resume skills against both Required_Skills AND Responsibilities sections of JD."
+]
+
         "Required_Skills_Missing_from_Resume": [
           "List JD-required skills that are NOT in the consolidated resume skill set"
         ],
         "Extra skills": [
-          "List additional skills candidate has beyond JD requirements"
+          "List additional skills candidate has beyond JD requirements and "EXCLUDE CERTIFICATIONS from Extra Skills: Only list actual tools/technologies, not certifications","
         ],
         "Summary": "<string>"
       }},
@@ -514,7 +564,7 @@ You are an expert resume evaluator. Analyze the resume against the job descripti
           {{
             "Company": "<Company Name>",
             "Role": "<Job Title>",
-            "Duration": "<Start - End (X years)>",
+            "Duration": "<Start - End (X.X years)>"or <Actual dates if available, otherwise 'Duration not specified'>",
             "Description": "<Work details>"
           }}
         ],
@@ -533,12 +583,15 @@ You are an expert resume evaluator. Analyze the resume against the job descripti
     }}
 
     **CRITICAL:**
-    - Do NOT calculate experience years – always set both fields to 0.0
+    
     - Capture ALL skills mentioned in the resume (Skills section, Projects, Experience, Certifications) regardless of duration
     - Focus on evaluating quality and relevance, not quantity or years
     - Education relevance is mandatory for scoring
     - Skills must come from the consolidated skill set, not just projects
     - Handle grouped skills carefully: split them correctly and ensure none are lost.
+    - If no dates are provided, use "Duration not specified"
+- NEVER invent or assume dates that aren't explicitly stated
+- Only calculate duration when actual start/end dates are provided
 
     RESUME: {resume_data}
     JOB DESCRIPTION: {json.dumps(job_description)}

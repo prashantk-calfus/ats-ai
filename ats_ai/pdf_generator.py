@@ -236,25 +236,34 @@ def generate_pdf_report(evaluation_results, parsed_resume, candidate_name, jd_so
 
     story.append(Spacer(1, 15))
 
+    # Replace the Weaknesses section (around lines 200-220) with this corrected logic:
+
     # Weaknesses
     story.append(Paragraph("Weaknesses:", subheading_style))
     cons = evaluation_results.get("Cons", [])
     if cons:
-        # Separate experience-related cons from others (matching Streamlit logic)
+        # Get experience data for validation
+        candidate_exp = evaluation_results.get("Total_Experience_Years", 0)
+        required_exp = evaluation_results.get("JD_Required_Experience_Years", 0)
+
+        # Separate experience-related cons from others
         experience_cons = []
         other_cons = []
 
         for c in cons:
             if any(keyword in c.lower() for keyword in ["experience", "years", "senior", "junior"]):
-                experience_cons.append(c)
+                # Only include experience cons if candidate actually doesn't meet requirement
+                if required_exp > 0 and candidate_exp < required_exp:
+                    experience_cons.append(c)
+                # If candidate meets requirement, skip experience-related cons
             else:
                 other_cons.append(c)
 
-        # Display experience cons first and prominently
+        # Display experience cons first (only if candidate doesn't meet requirement)
         if experience_cons:
             story.append(Paragraph("•Experience Issues:", subheading_style))
             for exp_con in experience_cons:
-                story.append(Paragraph(f" {exp_con}", styles["Normal"]))
+                story.append(Paragraph(f"  {exp_con}", styles["Normal"]))
             story.append(Spacer(1, 8))
 
         # Then display other cons
@@ -263,10 +272,12 @@ def generate_pdf_report(evaluation_results, parsed_resume, candidate_name, jd_so
                 story.append(Paragraph("Other Areas for Improvement:", subheading_style))
             for other_con in other_cons:
                 story.append(Paragraph(f"• {other_con}", styles["Normal"]))
+
+        # If no cons remain after filtering, show this message
+        if not experience_cons and not other_cons:
+            story.append(Paragraph("• No specific weaknesses identified.", styles["Normal"]))
     else:
         story.append(Paragraph("• No specific weaknesses identified.", styles["Normal"]))
-
-    story.append(Spacer(1, 20))
 
     # === SKILLS ANALYSIS ===
     skills_match = evaluation_results.get("Skills Match", [])
