@@ -307,7 +307,6 @@ def calculate_weighted_score_and_status(
             "required_experience": jd_required_experience_years,
             "candidate_experience": candidate_total_experience_years,
         }
-
     # Calculate weighted score normally
     if not has_valid_projects or projects_score == 0.0:
         total_other_weights = experience_weight + skills_weight + education_weight
@@ -448,7 +447,6 @@ You are an expert resume evaluator. Analyze the resume against the job descripti
         - If the resume refers to a tool, platform, or concept with partial or alternate terminology, infer the full name or correct category using your understanding of the tech ecosystem.
         - Apply contextual reasoning to identify tools even if misspelled, abbreviated, or embedded in grouped lists.
 
-       
     **DIRECT JD MATCH ASSESSMENT:**
     Simply evaluate how well this resume matches the job description overall and provide a direct match percentage.
     Consider:
@@ -482,7 +480,6 @@ You are an expert resume evaluator. Analyze the resume against the job descripti
     - Example: Jan 2019 to Nov 2021 = (2021-2019) + (11-1)/12 = 2 + (10/12) = 2.83 years
     - Example: 2023-05 to Current = ({current_year} - 2023) + ({current_month} - 5) / 12 = {current_year - 2023} + {(current_month - 5) / 12:.2f} = {(current_year - 2023) + (current_month - 5) / 12:.2f} years
     - Example: 2018-07 to 2021-03 = (2021 - 2018) + (3 - 7) / 12 = 3 + (-4 / 12) = 3 - 0.33 = 2.67 years
-
     - Example : 01/2022 to 12/2024 = (2024-2022) + (12-1)/12 = 2 + 0.92 = 2.92 years
     - Example : March 2021 - November 2023 = (2023-2021) + (11-3)/12 = 2 + 0.67 = 2.67 years
     - Example : 06/2019 - Present = ({current_year}-2019) + ({current_month}-6)/12 = {current_year-2019} + {(current_month-6)/12:.2f} = {(current_year-2019) + (current_month-6)/12:.2f} years
@@ -490,8 +487,6 @@ You are an expert resume evaluator. Analyze the resume against the job descripti
     - Example : 2018 - 2020 (year only) = assume January to December = (2020-2018) + (12-1)/12 = 2.92 years
     - Example 8: Sept.2014 - Dec.2015 = (2015-2014) + (12-9)/12 = 1 + 0.25 = 1.25 years
     - Example 9: "26/12/2014 - 26/12/2016" = (2016-2014) + (12-12)/12 = 2 + 0 = 2.0 years
-
-
     - Round to 1 decimal place
     - If current date is needed, use {current_month_year} as reference
     
@@ -581,9 +576,7 @@ You are an expert resume evaluator. Analyze the resume against the job descripti
         ]
       }}
     }}
-
     **CRITICAL:**
-    
     - Capture ALL skills mentioned in the resume (Skills section, Projects, Experience, Certifications) regardless of duration
     - Focus on evaluating quality and relevance, not quantity or years
     - Education relevance is mandatory for scoring
