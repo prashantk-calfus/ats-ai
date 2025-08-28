@@ -268,7 +268,7 @@ async def generate_pdf_report_endpoint(report_data: Dict[str, Any]):
 async def download_report(filename: str):
     file_path = f"reports/{filename}"
     if os.path.exists(file_path):
-        return FileResponse(file_path, media_type="application/pdf", filename=filename)
+        return FileResponse(file_path, media_type="application/pdf", filename=filename, headers={"Content-Disposition": f"attachment; filename={filename}"})
     else:
         raise HTTPException(status_code=404, detail="Report file not found")
 
@@ -360,7 +360,7 @@ async def parse_and_evaluate(request: ParseAndEvaluateRequest):
 
     if abs(total_weight - 1.0) > 0.01:  # Allow small floating point differences
         return PlainTextResponse(content=f"Weightage must sum to 100% (1.0). Current sum: {total_weight:.2f}", status_code=400)
-
+    #
     try:
         resp = await combined_parse_evaluate(request.resume_data, request.jd_json, request.weightage_config)
         return resp

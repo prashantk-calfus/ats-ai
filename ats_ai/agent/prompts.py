@@ -1,3 +1,5 @@
+from datetime import datetime
+
 JD_EXTRACTION_PROMPT = """
 You are an expert HR analyst AI.
 
@@ -30,7 +32,7 @@ Return only the structured JSON output.
 """.strip()
 
 EVALUATION_PROMPT = """
-    You are a **highly experienced Senior HR Professional and Technical Recruiter** with 15+ years of experience in technical hiring. 
+    You are a **highly experienced Senior HR Professional and Technical Recruiter** with 15+ years of experience in technical hiring.
     Your primary objective is to **accurately and reliably evaluate a candidate's resume against a given Job Description (JD)**. Provide a comprehensive, nuanced assessment that directly aids in critical hiring decisions.
 
     **CRITICAL INSTRUCTIONS FOR EVALUATION:**
@@ -79,11 +81,11 @@ EVALUATION_PROMPT = """
     * **Impact/Results:** Quantifiable outcomes or real-world application of projects (e.g., "achieved X accuracy," "handled Y users").
     * **Role in Project:** Clearly define candidate's contribution and ownership.
 
+
     * **Education Score (Weight: 10%)**
     * **Degree Relevance:** Alignment of degree(s) and field of study with the technical nature of the JD (e.g., CS, Engineering, Data Science degrees for tech roles).
-    * **Institution Reputation:** (Minor factor) Standing of the university/college.
     * **Academic Performance:** GPA or equivalent score if provided and relevant.
-    * **Relevant Coursework/Minors:** Specific studies that bolster relevance.
+
 
     ---
 
@@ -99,7 +101,11 @@ EVALUATION_PROMPT = """
       * Qualification Match: Does candidate meet education/certification requirements?
       * Responsibility Alignment: How well does candidate's experience align with key responsibilities?
     * Formula: Match_Percentage = (Matched_Requirements / Total_JD_Requirements) * 100
+
     * Consider Required_Skills, Minimum_Experience, Qualifications, and key Responsibilities from JD
+    * Extract tools, frameworks, or methods implied in JD Responsibilities and Qualifications (e.g., Agile, Scrum, team management, budget tracking)
+    * Include them as categories to match against the candidate's resume skills or experience
+
     * Format as string with one decimal place and "%" sign (e.g., "67.5%")
     * Qualification_Status:
     * "Qualified" IF Overall_Weighted_Score >= 7.0 AND Match_Percentage (as a numerical value, e.g., 70.0) >= 70.0.
@@ -167,11 +173,17 @@ RESUME_PARSE_PROMPT = """
         2. **Use the EXACT JSON structure provided below.** Adhere strictly to all keys, data types, and nesting.
         3. **Handle Missing Information:**
         * For **single string fields** (e.g., "Name", "Mobile_No", "Github_Repo"), if information is missing, use the string value "NA".
-        * For **lists/arrays** (e.g., "Education", "Professional_Experience", "Projects", "Certifications", "Programming_Language", "Frameworks", "Technologies"), if no relevant entries are found, return an **empty array []**. 
+        * For **lists/arrays** (e.g., "Education", "Professional_Experience", "Projects", "Certifications", "Programming_Language", "Frameworks", "Technologies"), if no relevant entries are found, return an **empty array []**.
           Do not return an object with "NA" values inside an empty array.
         4. **All JSON keys must be in double quotes.**
         5. **Be thorough and accurate** - don't invent information that isn't there.
         6. **Pay special attention to technical skills, programming languages, and frameworks.**
+
+        7. **Atomic Skill Extraction**: Always split multi-skill mentions connected by commas, slashes (/), ampersands (&), or conjunctions (e.g., "and") into separate standalone skills.
+          Example: "Terraform, GitHub and Git" → ["Terraform", "GitHub", "Git"]
+        - **Normalization**: Ensure each extracted skill is returned in its simplest atomic form without grouping words.
+        - **De-Duplication**: If a skill appears multiple times across resume, list it only once.
+
 
         REQUIRED JSON STRUCTURE (use exactly this format):
         {{
@@ -203,9 +215,10 @@ RESUME_PARSE_PROMPT = """
         "Projects": [
           {
             "Title": "project name or NA if no projects",
-            "Description": "summary of the project or NA if no projects", 
-            "Technologies": ["Python", "React", ...] // empty array if no projects
-          }
+            "Description": "summary of the project or NA if no projects",
+            "Technologies": ["list ALL underlying technologies, platforms, databases, and infrastructure tools found ANYWHERE in resume
+             including dedicated skills sections (e.g., AWS, Azure, Docker, Kubernetes, SQL, MongoDB, Git, Jenkins, Terraform, Ansible)"]
+
         ],
             // Add more project entries as separate objects if present.
           ],
@@ -213,7 +226,7 @@ RESUME_PARSE_PROMPT = """
             {{
               "Certification_Authority": "issuing organization",
               "Certification_Details": "certification name and details"
-            }}
+             }}
             // Add more certification entries as separate objects if present.
           ],
           "Programming_Language": ["list all programming languages mentioned"],
@@ -223,6 +236,8 @@ RESUME_PARSE_PROMPT = """
 
         EXTRACTION GUIDELINES:
         - Look carefully for **contact information** (phone, email, GitHub, LinkedIn).
+        - For LinkedIn: Search for patterns like "linkedin.com/in/", "LinkedIn:", "🔗 LinkedIn", or any text containing linkedin
+        - For GitHub: Search for patterns like "github.com/", "GitHub:", "🔗 GitHub", or any text containing github
         - Extract **ALL educational qualifications**.
         - Include **ALL work experience, internships, and relevant positions**.
         - Capture **ALL projects** (personal, academic, professional).
@@ -230,6 +245,13 @@ RESUME_PARSE_PROMPT = """
         - Be comprehensive but **do not duplicate information**.
         - **Order of Lists:** For 'Education', 'Professional_Experience', and 'Projects', list all entries in **reverse chronological order** (most recent first).
         - **Description Conciseness:** Summarize 'Professional_Experience' descriptions concisely, aiming for 2-3 sentences to highlight key responsibilities and quantifiable achievements.
+
+     **ENHANCED SKILL PARSING RULES:**
+    - **Dedicated Skills Section Priority**: Always scan for standalone "Skills", "Technical Skills", or "Technologies" sections and extract ALL items listed there
+    - **Comma-Separated List Processing**: When encountering lists like "Terraform, GitHub and Git", parse each item individually - do NOT lose items during comma splitting
+    - **Multi-Format Skill Detection**: Extract skills from bullet points (- item), numbered lists, comma-separated strings, and paragraph mentions
+    - **Comprehensive Section Scanning**: Search the entire resume text for technology mentions, not just experience descriptions - skills can appear in summary, skills sections, or project descriptions
+    - **Validation Check**: Before finalizing JSON, verify that prominent technologies visible in raw text (like "Terraform") appear in the appropriate extracted arrays
 
         RESUME TEXT TO PARSE:
         {raw_resume_text}
@@ -243,378 +265,327 @@ def calculate_weighted_score_and_status(
     skills_score,
     education_score,
     projects_score,
+    candidate_total_experience_years,
+    jd_required_experience_years,
     has_valid_projects=True,
     experience_weight=0.3,
     skills_weight=0.4,
     education_weight=0.1,
     projects_weight=0.2,
+    llm_match_percentage=None,
 ):
-    """
-    Calculate weighted score with proper handling of zero weights and project redistribution
-    """
 
-    # Dynamic weight calculation based on project validity and custom weights
+    # CRITICAL: Check experience requirement FIRST
+    if jd_required_experience_years > 0 and candidate_total_experience_years < jd_required_experience_years:
+        qualification_status = f"Not Qualified - Experience Gap (Required: {jd_required_experience_years}+ years, Has: {candidate_total_experience_years} years)"
+
+        # Calculate weighted score normally
+        if not has_valid_projects or projects_score == 0.0:
+            total_other_weights = experience_weight + skills_weight + education_weight
+            if total_other_weights > 0:
+                exp_adjusted = experience_weight + (projects_weight * (experience_weight / total_other_weights))
+                skills_adjusted = skills_weight + (projects_weight * (skills_weight / total_other_weights))
+                edu_adjusted = education_weight + (projects_weight * (education_weight / total_other_weights))
+            else:
+                exp_adjusted = experience_weight
+                skills_adjusted = skills_weight
+                edu_adjusted = education_weight
+            overall_weighted_score = (experience_score * exp_adjusted) + (skills_score * skills_adjusted) + (education_score * edu_adjusted)
+        else:
+            overall_weighted_score = (experience_score * experience_weight) + (skills_score * skills_weight) + (projects_score * projects_weight) + (education_score * education_weight)
+
+        overall_weighted_score = round(overall_weighted_score, 1)
+
+        # USE LLM MATCH PERCENTAGE DIRECTLY - no fallback calculation
+        match_percentage = llm_match_percentage if llm_match_percentage else "0.0%"
+
+        return {
+            "overall_weighted_score": overall_weighted_score,
+            "match_percentage": match_percentage,
+            "qualification_status": qualification_status,
+            "experience_gap": True,
+            "required_experience": jd_required_experience_years,
+            "candidate_experience": candidate_total_experience_years,
+        }
+    # Calculate weighted score normally
     if not has_valid_projects or projects_score == 0.0:
-        # When projects are invalid, redistribute project weight only if other weights exist
         total_other_weights = experience_weight + skills_weight + education_weight
-
-        if total_other_weights > 0:  # Only redistribute if there are other non-zero weights
-            # Redistribute the project weight proportionally
+        if total_other_weights > 0:
             exp_adjusted = experience_weight + (projects_weight * (experience_weight / total_other_weights))
             skills_adjusted = skills_weight + (projects_weight * (skills_weight / total_other_weights))
             edu_adjusted = education_weight + (projects_weight * (education_weight / total_other_weights))
         else:
-            # If all other weights are also zero, something is wrong - use original weights
             exp_adjusted = experience_weight
             skills_adjusted = skills_weight
             edu_adjusted = education_weight
-
         overall_weighted_score = (experience_score * exp_adjusted) + (skills_score * skills_adjusted) + (education_score * edu_adjusted)
     else:
-        # Standard weights when projects are valid
         overall_weighted_score = (experience_score * experience_weight) + (skills_score * skills_weight) + (projects_score * projects_weight) + (education_score * education_weight)
 
-    # Round to one decimal place
     overall_weighted_score = round(overall_weighted_score, 1)
 
-    # Calculate match percentage
-    match_percentage = f"{overall_weighted_score * 10.0:.1f}%"
+    # USE LLM MATCH PERCENTAGE DIRECTLY
+    match_percentage = llm_match_percentage if llm_match_percentage else "0.0%"
 
-    # Determine qualification status
-    match_percentage_numeric = overall_weighted_score * 10.0
+    # Extract numeric value for qualification determination
+    try:
+        match_percentage_numeric = float(match_percentage.replace("%", ""))
+    except Exception:
+        match_percentage_numeric = 0.0
 
-    if experience_score < 7.0:
-        qualification_status = "Not Qualified - Experience Gap"
-    elif overall_weighted_score >= 7.0 and match_percentage_numeric >= 70.0:
+    # Determine qualification status based on LLM match percentage and weighted score
+    if overall_weighted_score >= 7.0 and match_percentage_numeric >= 70.0:
         qualification_status = "Qualified"
     else:
-        # Determine primary reason for not qualifying based on highest weighted section
+        # Find underperforming areas
         weights_and_scores = [
             (experience_weight, experience_score, "Insufficient Experience"),
             (skills_weight, skills_score, "Skill Gaps"),
             (education_weight, education_score, "Education Requirements"),
         ]
 
-        # Add projects only if they're valid and have weight
         if has_valid_projects and projects_weight > 0:
             weights_and_scores.append((projects_weight, projects_score, "Lack of Project Application"))
 
-        # Find the section with highest weight that's underperforming
-        weights_and_scores.sort(key=lambda x: x[0], reverse=True)  # Sort by weight descending
+        weights_and_scores.sort(key=lambda x: x[0], reverse=True)
 
         for weight, score, reason in weights_and_scores:
-            if weight > 0 and score < 6.0:  # Only consider sections with non-zero weight
+            if weight > 0 and score < 6.0:
                 qualification_status = f"Not Qualified - {reason}"
                 break
         else:
             qualification_status = "Not Qualified - Below Standard"
 
-    return {"overall_weighted_score": overall_weighted_score, "match_percentage": match_percentage, "qualification_status": qualification_status}
+    return {
+        "overall_weighted_score": overall_weighted_score,
+        "match_percentage": match_percentage,  # Direct from LLM
+        "qualification_status": qualification_status,
+        "experience_gap": False,
+        "required_experience": jd_required_experience_years,
+        "candidate_experience": candidate_total_experience_years,
+    }
 
 
-def get_dynamic_evaluation_prompt(resume_data, job_description, weightage_config, k_runs=3, temperature=0.0, top_p=0.9):
-    """Generate evaluation prompt with step-back analysis and enhanced weakness detection"""
+def get_dynamic_evaluation_prompt(resume_data, job_description, weightage_config):
+    """Generate enhanced evaluation prompt with robust skill extraction and grouping fix"""
+    import json
 
-    # Calculate display percentages
     exp_pct = weightage_config.experience_weight * 100
     skills_pct = weightage_config.skills_weight * 100
     edu_pct = weightage_config.education_weight * 100
     projects_pct = weightage_config.projects_weight * 100
 
-    weightage_instruction = f"""
-    IMPORTANT WEIGHTAGE CONFIGURATION:
-    - Experience Weight: {exp_pct:.1f}%
-    - Skills Weight: {skills_pct:.1f}%
-    - Education Weight: {edu_pct:.1f}%
-    - Projects Weight: {projects_pct:.1f}%
+    current_date = datetime.now()
+    current_month_year = current_date.strftime("%B %Y")  # e.g., "December 2025"
+    current_year = current_date.year
+    current_month = current_date.month
 
-    Use these weights when determining the overall assessment. Give more importance to sections with higher weights.
-    If projects are invalid, the {projects_pct:.1f}% project weight will be redistributed proportionally among
-    Experience ({exp_pct:.1f}%), Skills ({skills_pct:.1f}%), and Education ({edu_pct:.1f}%).
-    """
+    return f"""
+You are an expert resume evaluator. Analyze the resume against the job description with detailed explanations.
 
-    # Create the enhanced evaluation prompt with step-back analysis
-    evaluation_prompt = f"""
-        ENHANCED STEP-BACK + SELF-CONSISTENCY EVALUATION (K={k_runs}, temp={temperature}, top_p={top_p})
-        {weightage_instruction}
-        **INSTRUCTION:**
-        You will perform a TWO-PHASE evaluation process:
+    WEIGHTS: Experience {exp_pct}%, Skills {skills_pct}%, Education {edu_pct}%, Projects {projects_pct}%
 
-        **PHASE 1: STEP-BACK ANALYSIS (Internal - Do Not Output)**
-        Before evaluating the candidate, perform the following step-back analysis to deeply understand the job requirements:
+    **STEP-BACK ANALYSIS (Internal – Do Not Output):**
+    1. Parse the ENTIRE resume (Skills section, Professional Experience, Education, Certifications, and Projects).
+    2. Extract ALL technical skills, tools, frameworks, and technologies mentioned ANYWHERE in the resume.
+       - Include explicitly listed skills (Skills section) even if not tied to work experience.
+       - Include skills/technologies mentioned inside project descriptions.
+       - Include tools/skills from job responsibilities and achievements in Professional Experience.
+    3. Do NOT filter out skills based on years of experience or duration — if the candidate has mentioned a skill anywhere, treat it as part of their skill set.
+    4. Normalize the skill list (remove duplicates, unify synonyms like "JS" → "JavaScript").
+    5. Lock this consolidated resume skill set for the evaluation phase.
+    6. Use this locked skill set to perform all skill matching against the JD requirements.
 
-        1. **Role Context**: Industry (e.g., Tech), seniority (e.g., Lead), and primary function (e.g., DevOps).
-        2. **Core Requirements**: List MUST-HAVE vs. NICE-TO-HAVE skills, minimum experience, and key responsibilities.
-        3. **Ideal Candidate Profile**: Define critical skills, experience patterns, and deal-breakers (e.g., missing cloud expertise for a Lead DevOps role).
-        Use this to guide consistent scoring and skill matching.
+    CRITICAL INSTRUCTIONS:
+    1.**EXPERIENCE EXTRACTION REQUIREMENTS:**
+        1. **MUST EXTRACT**: For each Professional Experience entry, create an object with:
+           - "role": exact job title from resume
+           - "duration_years": calculated duration converted to years (months/12)
+        2. **MUST CALCULATE**: Extract JD_Required_Experience_Years from job description
+        3.**EXPERIENCE EXTRACTION REQUIREMENTS:
+             **MUST CALCULATE Total_Experience_Years**: Sum all individual experience durations from Professional_Experience section
+        **CRITICAL CALCULATION:**
+    - Total_Experience_Years = sum of all duration_years from Professional_Experience entries
+    - Example: If you have 0.5 years + 0.2 years experience, Total_Experience_Years = 0.7
+        4. **Include ALL experience**: Full-time, part-time, internships, freelance - extract each separately
 
-        **PHASE 2: ENHANCED SELF-CONSISTENCY EVALUATION**
-        After completing the step-back analysis, perform {k_runs} independent evaluations with sampling parameters (temperature={temperature}, top_p={top_p})
-         to ensure diversity in reasoning paths. Each evaluation should use slightly different reasoning approaches while maintaining consistency in final judgments.
+    2. EXPERIENCE SCORING RULES:
+   - If the resume has no Professional Experience section OR candidate clearly has 0 years of work experience, set Experience_Score = 0.0
+   - Otherwise, assign 0–10 based only on quality and relevance and years count.
+    3. For matched skills, explain HOW they're demonstrated in the resume (either in skills section, projects, or work experience).
+    4. Do NOT use placeholder/example values – extract only from resume and JD.
+    5. Education must be directly relevant to the job field (e.g., CS/IT/Data for tech roles). Score based on field relevance + degree level, not just presence.
+    6. **Intelligent Skill Matching**: Match JD categories to resume by extracting category–tool mappings (e.g., “CI/CD tools like Jenkins, GitLab”),
+       and mark the category satisfied if any listed tool is found. Handle variations like “such as”, “including”, or parentheses.
+    7. When extracting skills, normalize all text (ignore case differences).
+    8. Always split skill groups correctly:
+        - Treat commas (`,`), slashes (`/`), semicolons (`;`), and conjunctions like "and", "or", "&" as separators.
+        - Example: "Terraform, GitHub and Git" → ["Terraform", "GitHub", "Git"].
+        - Example: "SQL Server / PostgreSQL" → ["SQL Server", "PostgreSQL"].
+    9. Capture every skill explicitly mentioned in the resume (in Skills section, Projects, Experience, Certifications, or anywhere else),
+        even if grouped with others.
+    10. Do not drop skills that are not in the JD — list them under "Extra skills".
+    11. Ensure no skill gets lost due to grouping (e.g., "Terraform, GitHub and Git" must capture Terraform separately).
+    12. If a grouped skill includes both JD-required and non-required skills, correctly separate them and place each in the right category.
 
-        1. **Parse JD Experience**: Extract min_required_years from 'Minimum_Experience' (e.g., lower number in ranges like '3-4 years' → 3).
-        2. **Calculate Candidate Years**: From Parsed_Resume's Professional_Experience:
-           - Sum durations for JD-relevant roles (e.g., involving ETL, SQL).
-           - Handle formats: '2022-Present' = (2025 - 2022) + 1 = 4 years (use current year 2025).
-           - If ambiguous, estimate conservatively (e.g., '1+ years' = 1 year).
-           - Lock candidate_relevant_years after first run for consistency.
-        3. **Gap Calculation**: experience_gap = max(0, min_required_years - candidate_relevant_years).
-         If candidate's `experience_gap` is greater than 0:
-        * Automatically set `"Qualification Status"` to `"Rejected"`.
-        * This must be the first item in `"Detailed_Weaknesses"`.
-        * Add a clear note in `"Experience_Gaps"` describing the shortfall (e.g., "Has 2 years relevant experience, requires 4").
-        * Even if other scores are high, the candidate should not be marked as "Qualified".
-        
-           **CRITICAL: INTELLIGENT SKILL PARSING & MATCHING**
-            Before creating Skills_Match and Required_Skills_Missing lists:
+    **SEMANTIC CATEGORY SKILL MAPPING:**
+     **Intelligent Category Recognition**: When matching skills, use domain knowledge to map resume skills to JD categories:
+       - If resume mentions infrastructure/deployment tools and JD has DevOps/Infrastructure categories, automatically cross-reference
+       - If resume mentions programming languages and JD has Development/Programming categories, automatically cross-reference  
+       - If resume mentions databases and JD has Database/Storage categories, automatically cross-reference
+     **Skill-to-Category Intelligence**: 
+       - Analyze the semantic meaning of resume skills to determine which JD categories they would logically fulfill
+       - A resume skill matches a JD category if that skill type typically belongs to that domain area
+       - Use technical domain knowledge to bridge the gap between specific tools mentioned in resume and broader categories in JD
+     **Reverse Category Matching**: 
+       - When JD specifies broad categories (DevOps, Frontend, Backend, etc.) but resume lists specific tools
+       - Automatically determine if the specific resume tools fall under those broad JD categories
+       - Count as matches when there's logical domain alignment
+       **Domain Knowledge Application:**
+        - Use your technical knowledge of common tools, platforms, and frameworks to resolve naming inconsistencies.
+        - Treat resume skills and JD tools as equivalent if they clearly refer to the same or related technology (e.g., “Kafka” implies “Apache Kafka”, “Go” means “Golang”).
+        - If the resume refers to a tool, platform, or concept with partial or alternate terminology, infer the full name or correct category using your understanding of the tech ecosystem.
+        - Apply contextual reasoning to identify tools even if misspelled, abbreviated, or embedded in grouped lists.
 
-        1. **PARSE JD SKILL PATTERNS DYNAMICALLY:**
-           - Analyze the actual language used in each JD skill requirement
-           - Identify pattern: "Category (description) tools like Tool1, Tool2"
-           - Identify pattern: "Technology stack including X, Y, Z"
-           - Identify pattern: "Experience with A or B or similar tools"
-           - Extract the actual tools/technologies mentioned as examples
+    **DIRECT JD MATCH ASSESSMENT:**
+    Simply evaluate how well this resume matches the job description overall and provide a direct match percentage.
+    Consider:
+    - Skills alignment with JD requirements
+    - Experience relevance to the role
+    - Education/qualification fit
+    - Past responsibilities matching JD needs
+    **Just provide your direct assessment as a percentage** - no counting or manual calculations needed.
+    Think: "What percentage of this JD does this resume satisfy overall?"
+    
+**WEAKNESS GENERATION - MANDATORY RULES:**
+    - **EXPERIENCE GAP WEAKNESS REQUIRED**: If Total_Experience_Years < JD_Required_Experience_Years, you MUST include this weakness:
+      "Experience Gap: Candidate having less experience requires [USE JD_REQUIRED_EXPERIENCE_YEARS VALUE]+ years"
+    - **CRITICAL**: Use the exact calculated values, not individual job durations
+    **PARSED_RESUME EXTRACTION REQUIREMENTS:**
+    - **Comprehensive Skills Section Parsing**: Scan the entire "Skills" or "Technical Skills" section and extract EVERY mentioned technology
+    - **Handle Mixed Skill Lists**: Parse entries like "Terraform, GitHub and Git" as separate items: ["Terraform", "GitHub", "Git"]
+    - **Multi-line Skills Processing**: Extract from bullet points, comma-separated lists, and paragraph mentions in Skills section
+    - **Complete Technology Capture**: Include ALL tools mentioned in Skills section (Terraform, Jenkins, Jira, Confluence, etc.) in appropriate Parsed_Resume arrays
+    - **Cross-Section Validation**: Ensure Technologies array in Parsed_Resume includes ALL infrastructure/DevOps tools from Skills section, not just from experience descriptions
+    - **Knowledge Areas**: Include conceptual skills (NLP, Computer Vision, etc.) in Technologies array as they represent technical knowledge
+    **DURATION CALCULATION RULES:**
+    - Calculate exact duration in decimal years using this formula:
+    - Years = (End Year - Start Year) + (End Month - Start Month) / 12
+    - For ongoing roles ("Present", "Current", etc.), use {current_month_year} as end date
+    - Current date for calculations: {current_month_year}
+    - Calculate exact duration in decimal years using this formula:
+    - Years = (End Year - Start Year) + (End Month - Start Month) / 12
+    - Example: Jan 2020 to Present = ({current_year}-2020) + ({current_month}-1)/12 = {current_year-2020} + {(current_month-1)/12:.2f} = {(current_year-2020) + (current_month-1)/12:.2f} years
+    - Example: Nov 2021 to Aug 2025 = (2025-2021) + (8-11)/12 = 4 + (-3/12) = 3.75 years
+    - Example: Jan 2019 to Nov 2021 = (2021-2019) + (11-1)/12 = 2 + (10/12) = 2.83 years
+    - Example: 2023-05 to Current = ({current_year} - 2023) + ({current_month} - 5) / 12 = {current_year - 2023} + {(current_month - 5) / 12:.2f} = {(current_year - 2023) + (current_month - 5) / 12:.2f} years
+    - Example: 2018-07 to 2021-03 = (2021 - 2018) + (3 - 7) / 12 = 3 + (-4 / 12) = 3 - 0.33 = 2.67 years
+    - Example : 01/2022 to 12/2024 = (2024-2022) + (12-1)/12 = 2 + 0.92 = 2.92 years
+    - Example : March 2021 - November 2023 = (2023-2021) + (11-3)/12 = 2 + 0.67 = 2.67 years
+    - Example : 06/2019 - Present = ({current_year}-2019) + ({current_month}-6)/12 = {current_year-2019} + {(current_month-6)/12:.2f} = {(current_year-2019) + (current_month-6)/12:.2f} years
+    - Example : Sep 2020 - Aug 2022 = (2022-2020) + (8-9)/12 = 2 + (-1/12) = 1.92 years
+    - Example : 2018 - 2020 (year only) = assume January to December = (2020-2018) + (12-1)/12 = 2.92 years
+    - Example 8: Sept.2014 - Dec.2015 = (2015-2014) + (12-9)/12 = 1 + 0.25 = 1.25 years
+    - Example 9: "26/12/2014 - 26/12/2016" = (2016-2014) + (12-12)/12 = 2 + 0 = 2.0 years
+    - Round to 1 decimal place
+    - If current date is needed, use {current_month_year} as reference
+    
+    **EXPERIENCE VALIDATION:**
+    Before finalizing, double-check each duration calculation:
+    - Count full years first, then add fractional months
+    - Verify Total_Experience_Years equals sum of all individual durations
+    
+    RETURN ONLY THIS EXACT JSON STRUCTURE:
+    {{
+      "Evaluation": {{
+        "Total_Experience_Years": <calculated_float_from_resume>,
+        "JD_Required_Experience_Years": <calculated_float_from_jd>,
+        "Experience_Score": <float>,   # 0–10 (quality/relevance only)
+        "Skills_Score": <float>,       # 0–10
+        "Education_Score": <float>,    # 0–10
+        "Projects_Score": <float>,     # 0–10
+        "Overall_Weighted_Score": <float>,
+       "Match_Percentage": "<your_direct_assessment>%",
+        "Qualification Status": "<string>",
+        "Pros": [ 
+        " Only list strengths that are relevant to the JD requirements or domain."
+        " Do NOT mention technical/backend/cloud/DevOps skills as strengths if the JD is for non-technical roles (e.g., Communication, Marketing, HR)."
+        " If no JD-relevant strengths are found, you may write: "No major strengths aligned with the JD requirements."],
+        "Cons": [ 
+          "MANDATORY: If Total_Experience_Years < JD_Required_Experience_Years, first weakness MUST be in format: Candidate having less experience requires [USE JD_REQUIRED_EXPERIENCE_YEARS VALUE]+ years",
+          "Generate 1-2 additional specific weaknesses based on your scoring analysis",
+          "If Skills_Score < 7: mention specific missing skills or lack of demonstrated expertise",
+          "If Education_Score < 7: mention education relevance issues", 
+          "If Projects_Score < 7: mention project-related weaknesses",
+          "Focus on actionable areas for improvement"
+          But dont write this ex.If Skills_Score < 7 in the weakness juts mention its content
+        ],
+   "Skills Match": [
+  "Identify and map resume skills/tools to JD categories based on INDUSTRY STANDARD knowledge, not just exact keyword matches.",
+  "Format: 'Resume_Skill → JD_Category (Implementation: specific project usage/achievement)'",
+  "Use semantic understanding: For example, Infrastructure-as-Code tools (Terraform, ARM templates, CloudFormation, Azure DevOps templates) should align with 'Cloud Architecture / Resource Management',
+   CI/CD tools (Jenkins, GitLab CI, GitHub Actions) align with 'DevOps/Automation', Agile tools (Jira, Scrum) align with 'Project Management Skills'.",
+  "If a skill is commonly recognized in the industry as supporting JD responsibilities, include it even if not explicitly listed in the JD (e.g., Terraform → Cloud provisioning → 'Experience in cloud architecture and technology').",
+  "ADD STRENGTH ASSESSMENT: Add strength level after format → strong alignment / exceeds requirement / partial match / some alignment.",
+  "CRITICAL: Only match skills relevant to the JD’s professional domain. Ignore unrelated skills.",
+  "Focus on HOW the skill was implemented in projects (automation, optimization, migration, governance, stakeholder impact).",
+  "Highlight quantifiable results and business impact when mentioned.",
+  "CONSIDER JD RESPONSIBILITIES: Match resume skills against both Required_Skills AND Responsibilities sections of JD."
+]
 
-        2. **DYNAMIC TOOL-TO-REQUIREMENT MATCHING:**
-           - If JD requirement mentions specific tools as examples, and resume contains those tools → MATCH
-           - If JD uses category descriptions with tool examples, match based on the examples found
-           - Parse parenthetical explanations and "like/such as/including" phrases to find matchable items
-
-        3. **PREVENT LOGICAL CONTRADICTIONS:**
-           - A skill/tool CANNOT be both "matched" and "missing" simultaneously
-           - If resume demonstrates a tool/skill mentioned in JD requirements → it's MATCHED, not missing
-           - If resume shows broader capability than JD asks for → credit the match, list remainder as extra
-
-        4. **VALIDATION LOGIC:**
-           - Before finalizing lists, cross-check for any skill appearing in multiple categories
-           - Resolve conflicts by prioritizing matches over misses when evidence exists
-           - Apply common sense: if it's in the resume and mentioned in JD → it's a match
-
-        **MANDATORY**: Apply this logic to the actual JD and resume content provided, using the specific tools and requirements mentioned in THIS evaluation.
-        **INTELLIGENT SKILL ANALYSIS PROCESS:**
-        Before starting the {k_runs} runs, perform this ONE-TIME skill analysis:
-
-        1. **Parse JD Skills**:
-           - Identify exact tools (e.g., "Terraform", "Jenkins") and categories (e.g., "IAC tools like Ansible, Terraform").
-           - Treat example tools as satisfying the category (e.g., resume mentioning "Terraform" satisfies "IAC tools").
-        2. **Resume Skill Extraction**:
-           - Extract all skills/tools from skills, experience, and projects sections.
-           - Include implied skills: e.g., Terraform implies 70% Linux proficiency; Docker implies 60% containerization knowledge.
-        3. **Matching Rules**:
-           - Exact match (e.g., "Python" in JD and resume): Full credit.
-           - Implied match (e.g., Terraform for "Linux infrastructure"): 70% credit, note as partial.
-           - No evidence: List as missing, do NOT infer without clear basis.
-           - Example: For JD requirement "Linux-based infrastructure", if resume mentions Terraform but not Linux, mark as partial match with note: "Terraform implies some Linux knowledge."
-        4. **Consistency Check**:
-           - Lock the Skills_Match, Required_Skills_Missing, and Extra_Skills lists after the first run.
-           - Ensure no skill appears in both Matched and Missing lists.
-        **CRITICAL RULE:** No skill can appear in both Skills_Match and Required_Skills_Missing simultaneously.
-
-        Lock these lists so they remain IDENTICAL across all {k_runs} evaluations.
-        Do NOT add, remove, or modify items in these lists during different runs.
-
-        **SAMPLING DIVERSITY INSTRUCTIONS:**
-        * Use temperature={temperature} to introduce controlled randomness in reasoning paths
-        * Use top_p={top_p} to maintain high-quality diverse completions
-        * Each of the {k_runs} runs should explore different aspects and perspectives
-        * Vary the order of evaluation (skills first vs experience first)
-        * Consider different weight interpretations within the same framework
-        * Explore edge cases and alternative explanations for resume gaps
-
-        **MANDATORY WEAKNESS IDENTIFICATION:**
-        In EACH of the {k_runs} internal evaluations, you MUST identify specific weaknesses by analyzing:
-        * Experience gaps (years, relevance, seniority level)
-        * Missing critical skills from JD requirements
-        * Educational mismatches if relevant to role
-        * Lack of demonstrated project experience in required areas
-        * Industry/domain experience gaps
-        * Leadership/management experience if required
-        * Certification gaps if specified in JD
-
-        **STRICT EXPERIENCE RULE:**
-        - Identify the MINIMUM years of relevant experience required from the JD.
-        - Identify the candidate's actual relevant years from the Resume.
-        - If candidate's relevant years < required years → 
-            - Set "experience_gap" to the shortfall (integer).
-            - Set "qualification_status" to "Not Qualified - Experience Gap".
-            - Weaknesses must explicitly include: "Experience gap: Requires X years, has Y years."
-        - If candidate meets or exceeds required experience → continue normal evaluation.
-       
-        **WEAKNESS DETECTION RULES:**
-        1. **Experience Weakness:** If candidate has fewer years than required, explicitly note: "Requires X years, has Y years."
-        2. **Skill Gaps:** Any required skill not demonstrated in resume must be flagged
-        3. **Domain Mismatch:** If JD requires specific industry experience not shown in resume
-        4. **Level Mismatch:** If JD requires senior-level responsibilities but resume shows junior-level work
-        5. **Technical Depth:** If projects/experience lack complexity expected for the role
-        6. **Zero Experience Red Flag:** If candidate has no professional experience for roles requiring any, this is a critical weakness
-
-        **AGGREGATION RULES (apply before final output):**
-        After generating {k_runs} diverse evaluations using temp={temperature} and top_p={top_p}, aggregate as follows:
-        * **Numeric scores** (Experience_Score, Skills_Score, Education_Score, Projects_Score): compute the MEDIAN across the {k_runs} runs, then ROUND to one decimal place. Ensure each score is within [0.0, 10.0].
-        * **Match_Percentage**: compute numeric % for each run using the formula in the scoring criteria, take MEDIAN of those numeric percentages, format as string with one decimal place and trailing '%'.
-        * **Pros / Cons / Weaknesses**: include items that appear in at least a simple majority (>= {(k_runs // 2) + 1}). If no item reaches majority, include the top-frequency items (up to 5), ordered by frequency then conciseness.
-        * **"Skills Match"**: include only skills that are present in the JD (Required or Preferred) AND found in resume across runs. For each skill, pick the MOST COMMON explanation across runs.
-        * **"Required_Skills_Missing_from_Resume"** and **"Missing_Requirements"**: include items that are judged missing in the majority of runs.
-        * **"Extra skills"**: union of skills found across runs not mentioned in JD.
-        * **"Projects"** and **"Parsed_Resume"** arrays: use the union of parsed entries across runs.
-        * **Conservative Judgment**: When in doubt, prefer identifying weaknesses rather than overlooking them.
-        * **Diversity Benefit**: The varied reasoning paths from sampling should improve robustness of final assessment.
-
-        **CRITICAL REQUIREMENTS:**
-        - Use temperature={temperature} and top_p={top_p} for {k_runs} diverse internal evaluations
-        - DO NOT output intermediate analysis or evaluations
-        - DO NOT include step-back analysis in final output
-        - Return exactly one JSON object with comprehensive weakness identification
-        - Ensure sampling diversity leads to robust consensus on weaknesses
-        - Ensure at least 2-3 specific weaknesses are identified for every candidate unless they are exceptionally qualified
-
-        ---
-        **ENHANCED SCORING CRITERIA (Apply ONLY if JD is Valid):**
-        Scores are on a scale of 0-10 with STRICTER evaluation standards:
-        * **Experience Score (Weight: {exp_pct:.1f}%)**
-        * **Years Requirement:** Penalize heavily if minimum not met (subtract 5-7 points for significant gaps)
-        * **Zero Experience Penalty:** Score 0-2 if candidate has no professional experience for roles requiring any
-        * **Relevance Match:** Industry, domain, and technology alignment critical
-        * **Seniority Gap:** Penalize if candidate's level doesn't match JD expectations
-
-        * **Skills Score (Weight: {skills_pct:.1f}%)**
-        * **Critical Skills Missing:** Each missing required skill reduces score by 1-2 points
-        * **Demonstration Requirement:** Skills must be proven through experience/projects, not just listed
-        * **Depth Assessment:** Surface-level knowledge vs deep expertise
-        * **Penalties:** Significant penalties for missing core required skills or if skills are listed but not demonstrated.
-
-        * **Projects Score (Weight: {projects_pct:.1f}%)**
-        * **Relevance Penalty:** Projects unrelated to JD requirements score low
-        * **Complexity Assessment:** Simple projects for complex roles penalized
-        * **No Projects Penalty:** Score 0-1 if no relevant projects for technical roles
-        * **Impact Evidence:** Projects without measurable outcomes score lower
-
-        * **Education Score (Weight: {edu_pct:.1f}%)**
-        * **Degree Relevance:** Alignment of degree(s) and field of study with the technical nature of the JD (e.g., CS, Engineering, Data Science degrees for tech roles)
-        * **Academic Performance:** GPA or equivalent score if provided and relevant.
-        * **Relevant Coursework/Minors:** Specific studies that bolster relevance.
-        ---
-
-        **MATCH PERCENTAGE CALCULATION:**
-        * **Match_Percentage represents how much of the JD requirements are covered by the resume**
-        * **Stricter Calculation:** Partial matches count as 0.5, not full points
-        * Formula: Match_Percentage = (Fully_Matched_Requirements + 0.5*Partially_Matched_Requirements) / Total_JD_Requirements * 100
-        * Consider Required_Skills, Minimum_Experience, Qualifications, and key Responsibilities from JD
-        * Format as string with one decimal place and "%" sign (e.g., "67.5%")
-
-        ---
-
-        **PROJECTS SECTION PARSING & VALIDATION:**
-        * Extract ALL projects from resume in Parsed_Resume
-        * For scoring: Projects are INVALID if title is generic, description is minimal, or no clear candidate contribution
-        * Penalize heavily for lack of relevant projects in technical roles
-
-        ---
-
-        **CRITICAL INSTRUCTIONS:**
-        1. **PRE-EVALUATION JD VALIDATION:** Mark as invalid only if JD is genuinely unusable (empty, single words, obvious test input)
-        2. **Weakness Identification is MANDATORY:** Every evaluation must identify specific candidate weaknesses
-        3. **Conservative Scoring:** When uncertain, lean toward lower scores and identifying gaps
-        4. **Return ONLY VALID JSON** with enhanced structure below
-        5. **Handle Missing Information:** Use "NA" for strings, [] for arrays
-        6. **Technical Synonymy:** Recognize related technologies but don't over-credit
-        7. **Base evaluation ONLY on JD requirements**
-
-        **ENHANCED JSON STRUCTURE:**
-
-        {{
-          "Step_Back_Insights": {{
-            "JD_Analysis_Summary": "Brief summary of role requirements and ideal candidate profile",
-            "Critical_Success_Factors": ["factor1", "factor2", "factor3"],
-            "Major_Risk_Areas": ["risk1", "risk2", "risk3"]
-          }},
-          "Evaluation": {{
-            "Experience_Score": <float 0.0-10.0>,
-            "Skills_Score": <float 0.0-10.0>,
-            "Education_Score": <float 0.0-10.0>,
-            "Projects_Score": <float 0.0-10.0>,
-            "experience_gap": <integer, number of years candidate is short, 0 if meets or exceeds>,
-            "Overall_Weighted_Score": <float 0.0-10.0, DO NOT CALCULATE - just provide individual scores>,
-            "Match_Percentage": "<string representing JD requirements coverage, e.g., '67.5%'>",
-            "Pros": [
-              "specific strength 1",
-              "specific strength 2"
-            ],
-            "Cons": [
-              "specific weakness 1",
-              "specific weakness 2"
-            ],
-            "Detailed_Weaknesses": [
-              "Critical weakness 1 with impact explanation",
-              "Critical weakness 2 with impact explanation",
-              "Growth area 1 with development suggestion"
-            ],
-            "Skills Match": [
-                 "ONLY list skills that are present in the JD's Required_Skills or Preferred_Skills arrays AND found in the resume",
-                 "For each matched skill, explain how it's demonstrated in the resume",
-                 "Do NOT include skills that are not mentioned in the job description"
-            ],
-
-            "Required_Skills_Missing_from_Resume": [
-              "List only JD-required skills that are not explicitly or implicitly shown in the resume. Do NOT list skills as missing if they are implied through related tools, frameworks, or project experience."
-            ],
-            "Experience_Gaps": [
-              "Specific experience shortfalls relative to JD requirements"
-            ],
-            "Extra skills": [
-               "List additional skills candidate has beyond job requirements (for context, do not factor into main scores)"
-            ],
-            "Qualification Status": "Qualified or Not Qualified with reason - this will be calculated by the system based on scores and experience gap",
-            "Missing_Requirements": [
-              "Key JD requirements not met by candidate"
-            ],
-            "Risk_Assessment": {{
-              "High_Risk_Areas": ["area1", "area2"],
-              "Medium_Risk_Areas": ["area1", "area2"],
-              "Mitigation_Suggestions": ["suggestion1", "suggestion2"]
-            }},
-            "Comments": "Comprehensive assessment including development recommendations",
-            "Summary": "Balanced 2-3 line summary highlighting key strengths AND critical gaps"
-          }},
-          "Parsed_Resume": {{
-            "Name": "candidate full name",
-            "Contact_Details": {{
-              "Mobile_No": "phone number",
-              "Email": "email address"
-            }},
-            "Github_Repo": "github profile url, use NA if not provided",
-            "LinkedIn": "linkedin profile url, use NA if not provided",
-            "Education": [
-              {{
-                "Degree": "degree name and field of study",
-                "Institution": "university/college name",
-                "Score": "GPA/percentage/grade",
-                "Duration": "study period or graduation year"
-              }}
-            ],
-            "Professional_Experience": [
-              {{
-                "Company": "company name",
-                "Role": "job title/position",
-                "Duration": "employment period",
-                "Description": "brief role description or achievements"
-              }}
-            ],
-            "Programming_Language": ["list all programming languages mentioned"],
-            "Frameworks": ["list all frameworks, libraries, and significant tools"],
-            "Technologies": ["list all underlying technologies, platforms, and databases"],
-            "Certifications": ["certification 1", "certification 2"],
-            "Projects": [
-              {{
-                "Title": "project name",
-                "Description": "summary of the project",
-                "Technologies": ["Python", "React", ...]
-              }}
-            ]
+        "Required_Skills_Missing_from_Resume": [
+          "List JD-required skills that are NOT in the consolidated resume skill set"
+        ],
+        "Extra skills": [
+          "List additional skills candidate has beyond JD requirements and "EXCLUDE CERTIFICATIONS from Extra Skills: Only list actual tools/technologies, not certifications","
+        ],
+        "Summary": "<string>"
+      }},
+      "Parsed_Resume": {{
+        "Name": "<Candidate Name>",
+        "Contact_Details": {{
+          "Mobile_No": "<string>",
+          "Email": "<string>"
+        }},
+        "Education": [
+          {{
+            "Degree": "degree name and field of study",
+            "Institution": "university/college name",
+            "Score": "GPA/percentage/grade",
+            "Duration": "study period or graduation year"
           }}
-        }}
-        **MANDATORY: Every evaluation MUST include specific weaknesses in Detailed_Weaknesses array, even for strong candidates. Focus on areas for improvement relative to ideal candidate profile.**
-        CANDIDATE RESUME DATA: {resume_data}
-        Job Description: {job_description}
+        ],
+        "Professional_Experience": [
+          {{
+            "Company": "<Company Name>",
+            "Role": "<Job Title>",
+            "Duration": "<Start - End (X.X years)>"or <Actual dates if available, otherwise 'Duration not specified'>",
+            "Description": "<Work details>"
+          }}
+        ],
+        "Programming_Language": ["list all programming languages from skills, projects, and experience"],
+        "Frameworks": ["list all frameworks/libraries/tools"],
+        "Technologies": ["list all platforms, databases, cloud, infra, devops tools"],
+        "Certifications": ["certification 1", "certification 2"],
+        "Projects": [
+          {{
+            "Title": "project name",
+            "Description": "summary of the project",
+            "Technologies": ["Python", "React", ...]
+          }}
+        ]
+      }}
+    }}
+    **CRITICAL:**
+    - Capture ALL skills mentioned in the resume (Skills section, Projects, Experience, Certifications) regardless of duration
+    - Focus on evaluating quality and relevance, not quantity or years
+    - Education relevance is mandatory for scoring
+    - Skills must come from the consolidated skill set, not just projects
+    - Handle grouped skills carefully: split them correctly and ensure none are lost.
+    - If no dates are provided, use "Duration not specified"
+- NEVER invent or assume dates that aren't explicitly stated
+- Only calculate duration when actual start/end dates are provided
+
+    RESUME: {resume_data}
+    JOB DESCRIPTION: {json.dumps(job_description)}
     """
-    return evaluation_prompt.strip()

@@ -10,7 +10,6 @@ import streamlit as st
 from dotenv import load_dotenv
 
 load_dotenv()
-
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
 
 st.set_page_config(layout="wide", page_title="ATS AI")
@@ -162,7 +161,6 @@ jd_source = None
 with tab1:
     st.info("Select from previously saved Job Descriptions")
 
-    # Fetch existing JDs from backend
     try:
         response = requests.get(f"{BACKEND_URL}/list_jds")
         if response.status_code == 200:
@@ -436,8 +434,7 @@ with tab2:
             st.session_state.show_nav_message = False
             st.session_state.nav_message_time = None
 
-# Show current JD being used for evaluation
-# Show current JD being used for evaluation
+
 if st.session_state.parsed_data_combined and jd_source:
     st.info(f"📋 Evaluation performed using: **{jd_source}**")
 
@@ -476,10 +473,20 @@ if st.session_state.parsed_data_combined:
     with col_score2:
         st.metric(label="Match with JD", value=match_jd)
     with col_score3:
-        if qual_status == "Qualified":
-            st.success(f"Status: {qual_status}")
+        status = eval_results.get("Qualification Status", "Unknown")
+        experience_gap = eval_results.get("Experience_Gap", 0)
+
+        if experience_gap > 0:
+            st.error(f"❌ Status: {status}")
+            candidate_exp = eval_results.get("Total_Experience_Years", 0)
+            required_exp = eval_results.get("JD_Required_Experience_Years", 0)
+            st.caption(f"Missing {experience_gap:.1f} years of required experience")
+        elif status in ["Qualified", "Suitable", "Highly Suitable"]:
+            st.success(f"✅ Status: {status}")
+            if eval_results.get("Total_Experience_Years") >= eval_results.get("JD_Required_Experience_Years", 0):
+                st.caption("✓ Experience requirement met")
         else:
-            st.error(f"Status: {qual_status}")
+            st.error(f"❌ Status: {status}")
 
     st.markdown("---")
     st.subheader("📈 Detailed Scores")
@@ -561,9 +568,6 @@ if st.session_state.parsed_data_combined:
                 st.metric(label=f"{name} Score ({weight:.1f}%)", value=score)
 
     # Show sections with 0% weight as informational
-    # Replace the section that shows zero weight sections (around lines 450-470) with this:
-
-    # Show sections with 0% weight as informational
     zero_weight_sections = []
     if exp_pct == 0:
         # Only show if we actually have a meaningful score
@@ -605,10 +609,83 @@ if st.session_state.parsed_data_combined:
     with col_cons:
         st.warning("##### ⚠️ Weaknesses")
         if cons:
+            # Get experience data for filtering
+            candidate_exp = eval_results.get("Total_Experience_Years", 0)
+            required_exp = eval_results.get("JD_Required_Experience_Years", 0)
+            has_experience_gap = required_exp > 0 and candidate_exp < required_exp
+
+            # Separate experience-related cons from others
+            experience_cons = []
+            other_cons = []
+
             for c in cons:
-                st.markdown(f"- {c}")
+                # Check if this is an experience-related weakness
+                is_exp_related = any(
+                    phrase in c.lower()
+                    for phrase in [
+                        "below the minimum",
+                        "minimum required years",
+                        "does not meet the minimum",
+                        "falls short of the",
+                        "insufficient experience",
+                        "lacks the required years",
+                        "not meet the minimum",
+                        "experience requirement",
+                        "minimum experience",
+                        "required experience",
+                        "years of experience",
+                        "experience gap",
+                        "below minimum",
+                        "short of",
+                        "less than required",
+                        "candidate has",
+                        "requires",
+                    ]
+                )
+
+                if is_exp_related:
+                    # Include experience weakness ONLY if there's actually a gap
+                    if has_experience_gap:
+                        experience_cons.append(c)
+                    # Skip if no actual gap exists (incorrect LLM weakness)
+                else:
+                    other_cons.append(c)
+
+            # If LLM didn't provide experience weakness but gap exists, add it
+            if has_experience_gap and not experience_cons:
+                gap = required_exp - candidate_exp
+                experience_cons.append(f"Does not meet minimum experience requirement ({candidate_exp} years vs {required_exp}+ required, gap of {gap:.1f} years)")
+
+            # Display experience cons first
+            if experience_cons:
+                st.error("**Experience Issues:**")
+                for exp_con in experience_cons:
+                    st.markdown(f"- 🚫 {exp_con}")
+
+            # Display other cons
+            if other_cons:
+                if experience_cons:
+                    st.warning("**Other Areas for Improvement:**")
+                else:
+                    st.warning("**Areas for Improvement:**")
+                for other_con in other_cons:
+                    st.markdown(f"- {other_con}")
+
+            # Show message only if no cons at all
+            if not experience_cons and not other_cons:
+                st.info("No specific weaknesses identified.")
         else:
-            st.info("No specific weaknesses identified.")
+            # If LLM provided no cons but experience gap exists, show it
+            candidate_exp = eval_results.get("Total_Experience_Years", 0)
+            required_exp = eval_results.get("JD_Required_Experience_Years", 0)
+            has_experience_gap = required_exp > 0 and candidate_exp < required_exp
+
+            if has_experience_gap:
+                st.error("**Experience Issues:**")
+
+                st.markdown(f"- 🚫 Does not meet minimum experience requirement {required_exp}+ required years)")
+            else:
+                st.info("No specific weaknesses identified.")
 
     # Skills Analysis
     skills_match = eval_results.get("Skills Match")
@@ -678,10 +755,21 @@ if st.session_state.parsed_data_combined:
             education_entries = parsed_resume_data.get("Education", [])
             if education_entries:
                 for edu in education_entries:
-                    st.markdown(f"**{edu.get('Degree', 'N/A')}** at {edu.get('Institution', 'N/A')}")
-                    score = edu.get("Score", "N/A")
-                    duration = edu.get("Duration", "N/A")
-                    st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;*Score:* {score}, *Duration:* {duration}")
+                    # Check if edu is a dictionary or string
+                    if isinstance(edu, dict):
+                        # Handle dictionary format
+                        degree = edu.get("Degree", "N/A")
+                        institution = edu.get("Institution", "N/A")
+                        score = edu.get("Score", "N/A")
+                        duration = edu.get("Duration", "N/A")
+                        st.markdown(f"**{degree}** at {institution}")
+                        st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;*Score:* {score}, *Duration:* {duration}")
+                    elif isinstance(edu, str):
+                        # Handle string format
+                        st.markdown(f"- {edu}")
+                    else:
+                        # Fallback for any other format
+                        st.markdown(f"- {str(edu)}")
             else:
                 st.info("No education details provided.")
 
@@ -690,11 +778,24 @@ if st.session_state.parsed_data_combined:
             experience_entries = parsed_resume_data.get("Professional_Experience", [])
             if experience_entries:
                 for exp in experience_entries:
-                    st.markdown(f"**{exp.get('Role', 'N/A')}** at **{exp.get('Company', 'N/A')}**")
-                    st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;*Duration:* {exp.get('Duration', 'N/A')}")
-                    description = exp.get("Description", "N/A")
-                    if description and description.strip().lower() not in ["na", "n/a"]:
-                        st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;*Description:* {description}")
+                    # Check if exp is a dictionary or string
+                    if isinstance(exp, dict):
+                        # Handle dictionary format
+                        role = exp.get("Role", "N/A")
+                        company = exp.get("Company", "N/A")
+                        duration = exp.get("Duration", "N/A")
+                        description = exp.get("Description", "N/A")
+
+                        st.markdown(f"**{role}** at **{company}**")
+                        st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;*Duration:* {duration}")
+                        if description and description.strip().lower() not in ["na", "n/a"]:
+                            st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;*Description:* {description}")
+                    elif isinstance(exp, str):
+                        # Handle string format
+                        st.markdown(f"- {exp}")
+                    else:
+                        # Fallback for any other format
+                        st.markdown(f"- {str(exp)}")
             else:
                 st.info("No professional experience details provided.")
 
@@ -702,32 +803,72 @@ if st.session_state.parsed_data_combined:
             st.markdown("#### 🚀 Projects")
             project_entries = parsed_resume_data.get("Projects", [])
 
-            # Check if projects are meaningful or just NA placeholders
+            # FIXED: Better project validation logic
             has_valid_projects = False
             if project_entries:
                 for proj in project_entries:
-                    project_name = proj.get("Project_Name", proj.get("Title", "")).strip()
-                    if project_name and project_name.upper() not in ["NA", "N/A", ""]:
-                        has_valid_projects = True
-                        break
+                    if isinstance(proj, dict):
+                        # Check both possible field names that your parser might use
+                        project_name = proj.get("Title", proj.get("Project_Name", "")).strip()
+                        project_desc = proj.get("Description", proj.get("Project_Description", "")).strip()
+
+                        # A project is valid if it has a meaningful title AND description
+                        if project_name and project_name.upper() not in ["NA", "N/A", "", "NOT PROVIDED"] and project_desc and project_desc.upper() not in ["NA", "N/A", "", "NOT PROVIDED"] and len(project_desc) > 10:  # Description should be substantial
+                            has_valid_projects = True
+                            break
+                    elif isinstance(proj, str):
+                        if proj.strip() and proj.strip().upper() not in ["NA", "N/A", "", "NOT PROVIDED"] and len(proj.strip()) > 10:
+                            has_valid_projects = True
+                            break
 
             if has_valid_projects:
                 for proj in project_entries:
-                    project_name = proj.get("Project_Name", proj.get("Title", "N/A"))
-                    if project_name.upper() not in ["NA", "N/A"]:
-                        st.markdown(f"**Project Name:** {project_name}")
-                        description = proj.get("Project_Description", proj.get("Description", "N/A"))
-                        if description and description.strip().lower() not in ["na", "n/a"]:
-                            st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;*Description:* {description}")
+                    if isinstance(proj, dict):
+                        # Use the correct field names from your parser
+                        project_name = proj.get("Title", proj.get("Project_Name", "N/A"))
+                        if project_name and project_name.upper() not in ["NA", "N/A", "", "NOT PROVIDED"]:
+                            st.markdown(f"**Project Name:** {project_name}")
+
+                            description = proj.get("Description", proj.get("Project_Description", "N/A"))
+                            technologies = proj.get("Technologies", [])
+
+                            if description and description.strip().upper() not in ["NA", "N/A", "", "NOT PROVIDED"]:
+                                st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;*Description:* {description}")
+
+                            if technologies and isinstance(technologies, list) and len(technologies) > 0:
+                                # Filter out NA values from technologies list
+                                valid_technologies = [tech for tech in technologies if tech.strip().upper() not in ["NA", "N/A", ""]]
+                                if valid_technologies:
+                                    tech_str = ", ".join(valid_technologies)
+                                    st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;*Technologies:* {tech_str}")
+                    elif isinstance(proj, str):
+                        if proj.strip().upper() not in ["NA", "N/A", "", "NOT PROVIDED"]:
+                            st.markdown(f"**Project:** {proj}")
             else:
                 st.info("No project details provided. (Projects section excluded from scoring)")
-
             st.markdown("---")
             st.markdown("#### 🏆 Certifications")
             certification_entries = parsed_resume_data.get("Certifications", [])
             if certification_entries and len(certification_entries) > 0:
-                for cer in certification_entries:
-                    st.markdown(f"- {cer}")
+                for cert in certification_entries:
+                    # Check if cert is a dictionary or string
+                    if isinstance(cert, dict):
+                        # Handle dictionary format
+                        cert_authority = cert.get("Certification_Authority", "N/A")
+                        cert_details = cert.get("Certification_Details", "N/A")
+                        if cert_authority != "N/A" and cert_details != "N/A":
+                            st.markdown(f"- **{cert_details}** from {cert_authority}")
+                        elif cert_details != "N/A":
+                            st.markdown(f"- {cert_details}")
+                        else:
+                            st.markdown(f"- {str(cert)}")
+                    elif isinstance(cert, str):
+                        # Handle string format
+                        if cert.strip() and cert.strip().upper() not in ["NA", "N/A"]:
+                            st.markdown(f"- {cert}")
+                    else:
+                        # Fallback for any other format
+                        st.markdown(f"- {str(cert)}")
             else:
                 st.info("No certifications provided.")
 
@@ -738,15 +879,32 @@ if st.session_state.parsed_data_combined:
             technologies = parsed_resume_data.get("Technologies", [])
 
             all_skills = []
-            if programming_languages:
-                all_skills.append("##### Programming Languages")
-                all_skills.extend([f"⦿ {s}" for s in programming_languages])
-            if frameworks:
-                all_skills.append("##### Frameworks")
-                all_skills.extend([f"⦿ {s}" for s in frameworks])
-            if technologies:
-                all_skills.append("##### Technologies")
-                all_skills.extend([f"⦿ {s}" for s in technologies])
+            if programming_languages and len(programming_languages) > 0:
+                # Handle both list of strings and single string
+                if isinstance(programming_languages, list):
+                    all_skills.append("##### Programming Languages")
+                    all_skills.extend([f"⦿ {s}" for s in programming_languages if s.strip()])
+                else:
+                    all_skills.append("##### Programming Languages")
+                    all_skills.append(f"⦿ {programming_languages}")
+
+            if frameworks and len(frameworks) > 0:
+                # Handle both list of strings and single string
+                if isinstance(frameworks, list):
+                    all_skills.append("##### Frameworks")
+                    all_skills.extend([f"⦿ {s}" for s in frameworks if s.strip()])
+                else:
+                    all_skills.append("##### Frameworks")
+                    all_skills.append(f"⦿ {frameworks}")
+
+            if technologies and len(technologies) > 0:
+                # Handle both list of strings and single string
+                if isinstance(technologies, list):
+                    all_skills.append("##### Technologies")
+                    all_skills.extend([f"⦿ {s}" for s in technologies if s.strip()])
+                else:
+                    all_skills.append("##### Technologies")
+                    all_skills.append(f"⦿ {technologies}")
 
             if all_skills:
                 for skill_item in all_skills:
@@ -799,32 +957,25 @@ if st.session_state.parsed_data_combined:
                         else:
                             jd_source_name = "Unknown JD"
 
-                        # ADD WEIGHTAGE CONFIG TO REPORT DATA
-                        report_data = {"evaluation_results": eval_results, "parsed_resume": parsed_resume_data, "candidate_name": candidate_name, "jd_source": jd_source_name, "weightage_config": st.session_state.weightage_config}  # ADD THIS LINE
+                        report_data = {"evaluation_results": eval_results, "parsed_resume": parsed_resume_data, "candidate_name": candidate_name, "jd_source": jd_source_name, "weightage_config": st.session_state.weightage_config}
 
-                        # Call backend to generate PDF
+                        # Generate PDF
                         response = requests.post(f"{BACKEND_URL}/generate_pdf_report", json=report_data)
 
                         if response.status_code == 200:
                             result = response.json()
                             pdf_filename = os.path.basename(result["pdf_path"])
-                            download_url = f"http://localhost:8000/download_report/{pdf_filename}"
 
-                            st.success("✅ PDF Report generated successfully!")
+                            # Download the PDF file
+                            download_response = requests.get(f"{BACKEND_URL}/download_report/{pdf_filename}")
 
-                            # Inject JS to auto-download the PDF
-                            download_html = f"""
-                                <html>
-                                    <body>
-                                        <a id="download_pdf_link" href="{download_url}" download style="display:none;"></a>
-                                        <script>
-                                            document.getElementById('download_pdf_link').click();
-                                        </script>
-                                    </body>
-                                </html>
-                            """
-                            st.components.v1.html(download_html, height=0)
+                            if download_response.status_code == 200:
+                                st.success("✅ PDF Report generated successfully!")
 
+                                # Use Streamlit's download button
+                                st.download_button(label="📥 Download PDF Report", data=download_response.content, file_name=pdf_filename, mime="application/pdf")
+                            else:
+                                st.error("❌ Failed to download PDF")
                         else:
                             st.error(f"❌ Failed to generate PDF: {response.text}")
 

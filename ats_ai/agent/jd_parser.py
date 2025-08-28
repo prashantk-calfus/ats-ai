@@ -4,19 +4,16 @@ import os
 from pathlib import Path
 
 import mammoth
-from dotenv import load_dotenv
-from google import genai
 from langchain_community.document_loaders import PyMuPDFLoader
+from openai import OpenAI
 
 from ats_ai.agent.llm_agent import extract_json_block
 from ats_ai.agent.prompts import JD_EXTRACTION_PROMPT
 
 logger = logging.getLogger(__name__)
 
-load_dotenv()
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-gemini_model = genai.Client()
+openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
 def create_empty_jd_structure() -> dict:
@@ -46,9 +43,8 @@ def extract_jd_info(jd_text: str) -> dict:
         # Create the prompt
         prompt = JD_EXTRACTION_PROMPT.format(jd_text=jd_text.strip())
 
-        # Get response from Gemini
-        response = gemini_model.models.generate_content(model="gemini-2.0-flash", contents=prompt)
-        raw_response = response.text.strip()
+        response = openai_client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}], temperature=0.0)
+        raw_response = response.choices[0].message.content.strip()  # ✅ Correct
 
         logger.info(f"Raw JD Extraction Output:\n{raw_response}")
 
