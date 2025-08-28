@@ -15,7 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Fixed
 - Placeholder for upcoming fixes.
 
+
 ---
+
+##[1.0.3] - 2025-08-28
+### Changed
+Updated regex logic to implement few-shot prompting, allowing experience to be fetched directly from LLM instead of manual parsing.
+---
+
 
 ## [1.0.2] - 2025-08-11
 ### Added
