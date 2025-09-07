@@ -106,23 +106,33 @@ async def combined_parse_evaluate(resume_data: str, job_description: dict, weigh
     print(json.dumps(parsed_response, indent=2))
     print("=== END PARSED RESPONSE ===")
     # After line where you get parsed_response, add this:
+    from datetime import datetime
+
+    def parse_date(date_str: str):
+        if date_str.upper() == "PRESENT":
+            return datetime.today()
+        return datetime.strptime(date_str, "%m/%Y")
+
+    def calculate_experience_from_dates(prof_exp: list):
+        total_months = 0
+        for exp in prof_exp:
+            duration = exp.get("Duration", "")
+            if "–" in duration:
+                try:
+                    start_str, end_str = duration.split("–")
+                    start = parse_date(start_str.strip())
+                    end = parse_date(end_str.strip())
+                    months = (end.year - start.year) * 12 + (end.month - start.month)
+                    total_months += months
+                except Exception as e:
+                    print(f"Could not parse duration {duration}: {e}")
+                    continue
+        return round(total_months / 12, 1)
+
+    # Usage:
     if "Parsed_Resume" in parsed_response:
         professional_exp = parsed_response["Parsed_Resume"].get("Professional_Experience", [])
-        calculated_total_exp = 0.0
-
-        for exp in professional_exp:
-            if isinstance(exp, dict):
-                duration_str = exp.get("Duration", "")
-                # Look for pattern like "(0.5 years)" in duration string
-                if "(" in duration_str and "years)" in duration_str:
-                    try:
-                        start_idx = duration_str.find("(") + 1
-                        end_idx = duration_str.find(" years)")
-                        years_value = float(duration_str[start_idx:end_idx])
-                        calculated_total_exp += years_value
-                    except (ValueError, IndexError):
-                        continue
-        calculated_total_exp = round(calculated_total_exp, 1)
+        calculated_total_exp = calculate_experience_from_dates(professional_exp)
         print(f"Calculated total experience: {calculated_total_exp}")
 
     # Extract experience information from LLM response and validate with our functions
@@ -132,20 +142,13 @@ async def combined_parse_evaluate(resume_data: str, job_description: dict, weigh
 
             # GET LLM'S DIRECT MATCH PERCENTAGE - ADD THIS LINE
             llm_match_percentage = evaluation.get("Match_Percentage", None)
-
-            # Get LLM's calculation
-            # evaluation.get("Total_Experience_Years", 0.0)
-            # llm_jd_required_experience = evaluation.get("JD_Required_Experience_Years", 0.0)
-
             experience_score = evaluation["Experience_Score"]
             skills_score = evaluation["Skills_Score"]
             education_score = evaluation["Education_Score"]
             projects_score = evaluation["Projects_Score"]
 
-            # Use LLM calculated experience values directly
-            # candidate_total_experience = evaluation.get("Total_Experience_Years", 0.0)
-            # With this:
             candidate_total_experience = calculated_total_exp if calculated_total_exp > 0 else evaluation.get("Total_Experience_Years", 0.0)
+
             jd_required_experience = evaluation.get("JD_Required_Experience_Years", 0.0)
 
         else:

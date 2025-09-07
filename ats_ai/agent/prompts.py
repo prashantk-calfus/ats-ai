@@ -1,5 +1,3 @@
-from datetime import datetime
-
 JD_EXTRACTION_PROMPT = """
 You are an expert HR analyst AI.
 
@@ -275,39 +273,7 @@ def calculate_weighted_score_and_status(
     llm_match_percentage=None,
 ):
 
-    # CRITICAL: Check experience requirement FIRST
-    if jd_required_experience_years > 0 and candidate_total_experience_years < jd_required_experience_years:
-        qualification_status = f"Not Qualified - Experience Gap (Required: {jd_required_experience_years}+ years, Has: {candidate_total_experience_years} years)"
-
-        # Calculate weighted score normally
-        if not has_valid_projects or projects_score == 0.0:
-            total_other_weights = experience_weight + skills_weight + education_weight
-            if total_other_weights > 0:
-                exp_adjusted = experience_weight + (projects_weight * (experience_weight / total_other_weights))
-                skills_adjusted = skills_weight + (projects_weight * (skills_weight / total_other_weights))
-                edu_adjusted = education_weight + (projects_weight * (education_weight / total_other_weights))
-            else:
-                exp_adjusted = experience_weight
-                skills_adjusted = skills_weight
-                edu_adjusted = education_weight
-            overall_weighted_score = (experience_score * exp_adjusted) + (skills_score * skills_adjusted) + (education_score * edu_adjusted)
-        else:
-            overall_weighted_score = (experience_score * experience_weight) + (skills_score * skills_weight) + (projects_score * projects_weight) + (education_score * education_weight)
-
-        overall_weighted_score = round(overall_weighted_score, 1)
-
-        # USE LLM MATCH PERCENTAGE DIRECTLY - no fallback calculation
-        match_percentage = llm_match_percentage if llm_match_percentage else "0.0%"
-
-        return {
-            "overall_weighted_score": overall_weighted_score,
-            "match_percentage": match_percentage,
-            "qualification_status": qualification_status,
-            "experience_gap": True,
-            "required_experience": jd_required_experience_years,
-            "candidate_experience": candidate_total_experience_years,
-        }
-    # Calculate weighted score normally
+    # Step 0: Calculate weighted score first
     if not has_valid_projects or projects_score == 0.0:
         total_other_weights = experience_weight + skills_weight + education_weight
         if total_other_weights > 0:
@@ -324,41 +290,43 @@ def calculate_weighted_score_and_status(
 
     overall_weighted_score = round(overall_weighted_score, 1)
 
-    # USE LLM MATCH PERCENTAGE DIRECTLY
-    match_percentage = llm_match_percentage if llm_match_percentage else "0.0%"
+    # Step 1: Hard disqualification - Any category < 7.0
+    if any(score < 7.0 for score in [experience_score, skills_score, education_score, projects_score]):
+        return {
+            "overall_weighted_score": overall_weighted_score,  # keep the actual score
+            "match_percentage": llm_match_percentage if llm_match_percentage else "0.0%",
+            "qualification_status": "Not Qualified - Category score below threshold (requires >= 7.0 in all)",
+            "experience_gap": False,
+            "required_experience": jd_required_experience_years,
+            "candidate_experience": candidate_total_experience_years,
+        }
 
-    # Extract numeric value for qualification determination
+    # Step 2: Experience Gap Check
+    if jd_required_experience_years > 0 and candidate_total_experience_years < jd_required_experience_years:
+        return {
+            "overall_weighted_score": overall_weighted_score,
+            "match_percentage": llm_match_percentage if llm_match_percentage else "0.0%",
+            "qualification_status": f"Not Qualified - Experience Gap (Required: {jd_required_experience_years}+ years, Has: {candidate_total_experience_years} years)",
+            "experience_gap": True,
+            "required_experience": jd_required_experience_years,
+            "candidate_experience": candidate_total_experience_years,
+        }
+
+    # Step 3: Normal qualification logic
+    match_percentage = llm_match_percentage if llm_match_percentage else "0.0%"
     try:
         match_percentage_numeric = float(match_percentage.replace("%", ""))
     except Exception:
         match_percentage_numeric = 0.0
 
-    # Determine qualification status based on LLM match percentage and weighted score
     if overall_weighted_score >= 7.0 and match_percentage_numeric >= 70.0:
         qualification_status = "Qualified"
     else:
-        # Find underperforming areas
-        weights_and_scores = [
-            (experience_weight, experience_score, "Insufficient Experience"),
-            (skills_weight, skills_score, "Skill Gaps"),
-            (education_weight, education_score, "Education Requirements"),
-        ]
-
-        if has_valid_projects and projects_weight > 0:
-            weights_and_scores.append((projects_weight, projects_score, "Lack of Project Application"))
-
-        weights_and_scores.sort(key=lambda x: x[0], reverse=True)
-
-        for weight, score, reason in weights_and_scores:
-            if weight > 0 and score < 6.0:
-                qualification_status = f"Not Qualified - {reason}"
-                break
-        else:
-            qualification_status = "Not Qualified - Below Standard"
+        qualification_status = "Not Qualified - Below Standard"
 
     return {
         "overall_weighted_score": overall_weighted_score,
-        "match_percentage": match_percentage,  # Direct from LLM
+        "match_percentage": match_percentage,
         "qualification_status": qualification_status,
         "experience_gap": False,
         "required_experience": jd_required_experience_years,
@@ -374,11 +342,6 @@ def get_dynamic_evaluation_prompt(resume_data, job_description, weightage_config
     skills_pct = weightage_config.skills_weight * 100
     edu_pct = weightage_config.education_weight * 100
     projects_pct = weightage_config.projects_weight * 100
-
-    current_date = datetime.now()
-    current_month_year = current_date.strftime("%B %Y")  # e.g., "December 2025"
-    current_year = current_date.year
-    current_month = current_date.month
 
     return f"""
 You are an expert resume evaluator. Analyze the resume against the job description with detailed explanations.
@@ -399,19 +362,32 @@ You are an expert resume evaluator. Analyze the resume against the job descripti
     CRITICAL INSTRUCTIONS:
     1.**EXPERIENCE EXTRACTION REQUIREMENTS:**
         1. **MUST EXTRACT**: For each Professional Experience entry, create an object with:
-           - "role": exact job title from resume
-           - "duration_years": calculated duration converted to years (months/12)
-        2. **MUST CALCULATE**: Extract JD_Required_Experience_Years from job description
-        3.**EXPERIENCE EXTRACTION REQUIREMENTS:
-             **MUST CALCULATE Total_Experience_Years**: Sum all individual experience durations from Professional_Experience section
-        **CRITICAL CALCULATION:**
-    - Total_Experience_Years = sum of all duration_years from Professional_Experience entries
-    - Example: If you have 0.5 years + 0.2 years experience, Total_Experience_Years = 0.7
-        4. **Include ALL experience**: Full-time, part-time, internships, freelance - extract each separately
+        - "role": exact job title from resume
+        - "Duration": "MM/YYYY–MM/YYYY or MM/YYYY–PRESENT"
 
-    2. EXPERIENCE SCORING RULES:
+        2. **MUST CALCULATE**: Extract JD_Required_Experience_Years from job description
+        
+        3. **Include ALL experience**: Full-time, part-time, internships, freelance - extract each separately
+        - DO NOT calculate years inside LLM. 
+        - Just output normalized date ranges in MM/YYYY format (strict).
+        - Always convert all formats like:
+           • "Jan 2015 – Mar 2018" → "01/2015–03/2018"
+           • "2019 – Present" → "01/2019–PRESENT"
+           • "07/2020–current" → "07/2020–PRESENT"
+           • "07/2020–Ongoing" → "07/2020–PRESENT"
+           • If only year is given ("2018"), normalize to "01/2018".
+
+2. EXPERIENCE SCORING RULES:
    - If the resume has no Professional Experience section OR candidate clearly has 0 years of work experience, set Experience_Score = 0.0
-   - Otherwise, assign 0–10 based only on quality and relevance and years count.
+   - Otherwise, assign 0–10 based on:
+       • ONLY include experience entries that **directly relate to the JD responsibilities, required skills, and role type**.
+       • **IGNORE** unrelated experience completely in the scoring calculation.
+       • If the candidate has high total experience but **none of it aligns with JD**, set Experience_Score = 0–3.
+       • Hands-on experience vs leadership/oversight roles must be reflected according to JD expectations:
+          - If JD emphasizes leadership/project management, **pure technical hands-on experience without leadership should be penalized**.
+       • Missing mandatory role-specific skills (e.g., Project Management, Leadership) should automatically reduce the Experience_Score by 2–4 points.
+       • Explicitly instruct: “**Do not inflate score based on total years; only relevant experience counts**.”
+
     3. For matched skills, explain HOW they're demonstrated in the resume (either in skills section, projects, or work experience).
     4. Do NOT use placeholder/example values – extract only from resume and JD.
     5. Education must be directly relevant to the job field (e.g., CS/IT/Data for tech roles). Score based on field relevance + degree level, not just presence.
@@ -441,7 +417,7 @@ You are an expert resume evaluator. Analyze the resume against the job descripti
        - When JD specifies broad categories (DevOps, Frontend, Backend, etc.) but resume lists specific tools
        - Automatically determine if the specific resume tools fall under those broad JD categories
        - Count as matches when there's logical domain alignment
-       **Domain Knowledge Application:**
+    **Domain Knowledge Application:**
         - Use your technical knowledge of common tools, platforms, and frameworks to resolve naming inconsistencies.
         - Treat resume skills and JD tools as equivalent if they clearly refer to the same or related technology (e.g., “Kafka” implies “Apache Kafka”, “Go” means “Golang”).
         - If the resume refers to a tool, platform, or concept with partial or alternate terminology, infer the full name or correct category using your understanding of the tech ecosystem.
@@ -456,7 +432,36 @@ You are an expert resume evaluator. Analyze the resume against the job descripti
     - Past responsibilities matching JD needs
     **Just provide your direct assessment as a percentage** - no counting or manual calculations needed.
     Think: "What percentage of this JD does this resume satisfy overall?"
-    
+        
+        **Scoring Instructions
+        For each category (Experience, Skills, Education, Projects):
+        - Assign a raw score between 0.0 and 10.0.
+        - Show reasoning: which parts of the resume support this score.
+        - Skills Score must directly depend on JD skill match:
+           • Fully matched core skills → ≥ 8.0
+           • Missing 1–2 mandatory skills → ≤ 7.0
+           • Missing >2 mandatory skills → ≤ 6.0
+        - Experience Score must reflect both duration and role alignment (hands-on vs leadership).
+        - Projects Score must reflect relevance to JD responsibilities (e.g., leading initiatives, delivering outcomes).
+        - Education Score must reflect formal qualification relevance.
+        
+        **Qualification Rules (Apply in Strict Order)
+        Step 1: Hard Disqualification Filters
+        - If ANY category score < 7.0 → Status =  Not Qualified
+        - If  Required Skills Missing includes any JD mandatory skills (leadership, project management, NodeJS/Java/Python, React.js/Angular) → Status =  Not Qualified
+        - If Role Alignment Validation fails (no evidence of team mgmt, budget, stakeholder reporting, governance) → Status = Not Qualified
+        
+        Step 2: Weighted Scoring (only if Step 1 passes)
+        - Qualification Status:
+           • Overall Score ≥ 7.0 AND Match% ≥ 70% → Qualified
+           • 5.0 ≤ Overall Score < 7.0 → Partially Qualified
+           • Overall Score < 5.0 →  Not Qualified
+        
+        
+        "Duration": "<Start_MM/YYYY – End_MM/YYYY>" 
+           OR "<Start_MM/YYYY – PRESENT>" 
+           OR "Duration not specified" if no dates are provided
+
 **WEAKNESS GENERATION - MANDATORY RULES:**
     - **EXPERIENCE GAP WEAKNESS REQUIRED**: If Total_Experience_Years < JD_Required_Experience_Years, you MUST include this weakness:
       "Experience Gap: Candidate having less experience requires [USE JD_REQUIRED_EXPERIENCE_YEARS VALUE]+ years"
@@ -468,33 +473,9 @@ You are an expert resume evaluator. Analyze the resume against the job descripti
     - **Complete Technology Capture**: Include ALL tools mentioned in Skills section (Terraform, Jenkins, Jira, Confluence, etc.) in appropriate Parsed_Resume arrays
     - **Cross-Section Validation**: Ensure Technologies array in Parsed_Resume includes ALL infrastructure/DevOps tools from Skills section, not just from experience descriptions
     - **Knowledge Areas**: Include conceptual skills (NLP, Computer Vision, etc.) in Technologies array as they represent technical knowledge
-    **DURATION CALCULATION RULES:**
-    - Calculate exact duration in decimal years using this formula:
-    - Years = (End Year - Start Year) + (End Month - Start Month) / 12
-    - For ongoing roles ("Present", "Current", etc.), use {current_month_year} as end date
-    - Current date for calculations: {current_month_year}
-    - Calculate exact duration in decimal years using this formula:
-    - Years = (End Year - Start Year) + (End Month - Start Month) / 12
-    - Example: Jan 2020 to Present = ({current_year}-2020) + ({current_month}-1)/12 = {current_year-2020} + {(current_month-1)/12:.2f} = {(current_year-2020) + (current_month-1)/12:.2f} years
-    - Example: Nov 2021 to Aug 2025 = (2025-2021) + (8-11)/12 = 4 + (-3/12) = 3.75 years
-    - Example: Jan 2019 to Nov 2021 = (2021-2019) + (11-1)/12 = 2 + (10/12) = 2.83 years
-    - Example: 2023-05 to Current = ({current_year} - 2023) + ({current_month} - 5) / 12 = {current_year - 2023} + {(current_month - 5) / 12:.2f} = {(current_year - 2023) + (current_month - 5) / 12:.2f} years
-    - Example: 2018-07 to 2021-03 = (2021 - 2018) + (3 - 7) / 12 = 3 + (-4 / 12) = 3 - 0.33 = 2.67 years
-    - Example : 01/2022 to 12/2024 = (2024-2022) + (12-1)/12 = 2 + 0.92 = 2.92 years
-    - Example : March 2021 - November 2023 = (2023-2021) + (11-3)/12 = 2 + 0.67 = 2.67 years
-    - Example : 06/2019 - Present = ({current_year}-2019) + ({current_month}-6)/12 = {current_year-2019} + {(current_month-6)/12:.2f} = {(current_year-2019) + (current_month-6)/12:.2f} years
-    - Example : Sep 2020 - Aug 2022 = (2022-2020) + (8-9)/12 = 2 + (-1/12) = 1.92 years
-    - Example : 2018 - 2020 (year only) = assume January to December = (2020-2018) + (12-1)/12 = 2.92 years
-    - Example 8: Sept.2014 - Dec.2015 = (2015-2014) + (12-9)/12 = 1 + 0.25 = 1.25 years
-    - Example 9: "26/12/2014 - 26/12/2016" = (2016-2014) + (12-12)/12 = 2 + 0 = 2.0 years
-    - Round to 1 decimal place
-    - If current date is needed, use {current_month_year} as reference
     
-    **EXPERIENCE VALIDATION:**
-    Before finalizing, double-check each duration calculation:
-    - Count full years first, then add fractional months
-    - Verify Total_Experience_Years equals sum of all individual durations
     
+
     RETURN ONLY THIS EXACT JSON STRUCTURE:
     {{
       "Evaluation": {{
@@ -526,7 +507,7 @@ You are an expert resume evaluator. Analyze the resume against the job descripti
   "Use semantic understanding: For example, Infrastructure-as-Code tools (Terraform, ARM templates, CloudFormation, Azure DevOps templates) should align with 'Cloud Architecture / Resource Management',
    CI/CD tools (Jenkins, GitLab CI, GitHub Actions) align with 'DevOps/Automation', Agile tools (Jira, Scrum) align with 'Project Management Skills'.",
   "If a skill is commonly recognized in the industry as supporting JD responsibilities, include it even if not explicitly listed in the JD (e.g., Terraform → Cloud provisioning → 'Experience in cloud architecture and technology').",
-  "ADD STRENGTH ASSESSMENT: Add strength level after format → strong alignment / exceeds requirement / partial match / some alignment.",
+
   "CRITICAL: Only match skills relevant to the JD’s professional domain. Ignore unrelated skills.",
   "Focus on HOW the skill was implemented in projects (automation, optimization, migration, governance, stakeholder impact).",
   "Highlight quantifiable results and business impact when mentioned.",
@@ -559,7 +540,8 @@ You are an expert resume evaluator. Analyze the resume against the job descripti
           {{
             "Company": "<Company Name>",
             "Role": "<Job Title>",
-            "Duration": "<Start - End (X.X years)>"or <Actual dates if available, otherwise 'Duration not specified'>",
+            "Duration": "MM/YYYY–MM/YYYY or MM/YYYY–PRESENT",
+
             "Description": "<Work details>"
           }}
         ],
