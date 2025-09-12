@@ -3,3 +3,5 @@ uvicorn
 praw
 feedparser
 trafilatura
+dotenv
+google-generativeai

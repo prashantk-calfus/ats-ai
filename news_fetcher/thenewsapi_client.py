@@ -12,24 +12,34 @@ AI_KEYWORDS = [
     "Hugging Face", "Stability AI", "Generative AI", "NLP"
 ]
 
+import re
+
 def filter_ai_articles(articles):
     clean = []
+    # compile regex patterns for all keywords
+    ai_patterns = [re.compile(rf"\b{k.lower()}\b") for k in AI_KEYWORDS]
+
     for article in articles:
-        title = (article.get("title") or "").lower()
-        description = (article.get("description") or "").lower()
-        if any(k.lower() in title or k.lower() in description for k in AI_KEYWORDS):
+        text = f"{article.get('title', '')} {article.get('description', '')}".lower()
+        if any(p.search(text) for p in ai_patterns):
             clean.append(article)
     return clean
+
 
 def fetch_thenewsapi(query="AI", language="en", page_size=5):
     if not THENEWSAPI_API_KEY:
         raise ValueError("TheNewsAPI key not found in .env")
 
     url = "https://api.thenewsapi.com/v1/news/all"
+    from datetime import datetime
+
+    today = datetime.utcnow().date()  # UTC date
     params = {
         "q": query,
         "language": language,
         "page_size": page_size,
+        "from": today.isoformat(),
+        "to": today.isoformat(),
         "api_token": THENEWSAPI_API_KEY
     }
 
